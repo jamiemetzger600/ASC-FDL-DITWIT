@@ -110,6 +110,45 @@ const CAMERA_DATA: CameraManufacturer[] = [
       },
     ],
   },
+  {
+    name: "RED",
+    models: [
+      {
+        name: "V-RAPTOR 8K S35 (Spherical)",
+        resolutions: [
+          { name: "8K 17:9", width: 8192, height: 4320 },
+          { name: "8K 2:1", width: 8192, height: 4096 },
+          { name: "8K 2.4:1", width: 8192, height: 3456 },
+          { name: "8K 16:9", width: 7680, height: 4320 },
+          { name: "7K 17:9", width: 7168, height: 3780 },
+          { name: "7K 2:1", width: 7168, height: 3584 },
+          { name: "7K 2.4:1", width: 7168, height: 3024 },
+          { name: "7K 16:9", width: 6720, height: 3780 },
+          { name: "6K 17:9", width: 6144, height: 3240 },
+          { name: "6K 2:1", width: 6144, height: 3072 },
+          { name: "6K 2.4:1", width: 6144, height: 2592 },
+          { name: "6K 16:9", width: 5760, height: 3240 },
+          { name: "5K 17:9", width: 5120, height: 2700 },
+          { name: "5K 2:1", width: 5120, height: 2560 },
+          { name: "5K 2.4:1", width: 5120, height: 2160 },
+          { name: "5K 16:9", width: 4800, height: 2700 },
+          { name: "4K 17:9", width: 4096, height: 2160 },
+          { name: "4K 2:1", width: 4096, height: 2048 },
+          { name: "4K 2.4:1", width: 4096, height: 1716 },
+          { name: "4K 16:9", width: 3840, height: 2160 },
+          { name: "3K 17:9", width: 3072, height: 1620 },
+          { name: "3K 2:1", width: 3072, height: 1536 },
+          { name: "3K 2.4:1", width: 3072, height: 1286 },
+          { name: "3K 16:9", width: 2880, height: 1620 },
+          { name: "2K 17:9", width: 2048, height: 1080 },
+          { name: "2K 2:1", width: 2048, height: 1024 },
+          { name: "2K 2.4:1", width: 2048, height: 858 },
+          { name: "2K 16:9", width: 1920, height: 1080 },
+        ],
+      },
+      // Future RED models can be added here
+    ],
+  },
 ];
 
 const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
