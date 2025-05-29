@@ -1,0 +1,7 @@
+Recording Codec,Recording Format,Sensor Active Image Area (photosites),Recording File Container Size (pixel),Recording File Image Content (pixel),Sensor Image Area (mm),Sensor Image Area (inch),Image Circle (mm),Image Circle (inch),Frame Size in MB,Frame Size in Byte,Max FPS
+DNxHD,HD (1920x1080),2880 x 1620,1920 x 1080,1920 x 1080,23.76 x 13.37,0.935 x 0.526,27.26,1.073,-,-,55
+ProRes,HD (1920x1080),2880 x 1620,1920 x 1080,1920 x 1080,23.76 x 13.37,0.935 x 0.526,27.26,1.073,-,-,120
+ProRes,2K (2048x1152),2868 x 1614,2048 x 1152,2048 x 1152,23.66 x 13.32,0.932 x 0.524,27.15,1.069,-,-,60
+ARRIRAW (external),2.8K,2880 x 1620,2880 x 1620,2880 x 1620,23.76 x 13.37,0.935 x 0.526,27.26,1.073,7.0,7.008.640,60
+ProRes,2K (2048x1536),2868 x 2152,2048 x 1536,2048 x 1536,23.66 x 17.75,0.932 x 0.699,29.58,1.165,-,-,48
+ARRIRAW (external),2.8K,2880 x 2160,2880 x 2160,2880 x 2160,23.76 x 17.82,0.935 x 0.702,29.70,1.169,9.3,9.341.440,60

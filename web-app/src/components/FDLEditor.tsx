@@ -32,19 +32,127 @@ const CAMERA_DATA: CameraManufacturer[] = [
       {
         name: "ALEXA 35",
         resolutions: [
-          { name: "4.6K 3:2 Open Gate", width: 4608, height: 3164 },
-          { name: "4.6K 16:9", width: 4608, height: 2592 },
-          { name: "4K 16:9", width: 4096, height: 2304 },
-          { name: "3.3K 6:5", width: 3328, height: 2784 },
+          { name: "4.6K", width: 4608, height: 3164 },
+          { name: "4K", width: 4096, height: 2304 },
+          { name: "UHD", width: 3840, height: 2160 },
+          { name: "2K", width: 2048, height: 1152 },
+          { name: "HD", width: 1920, height: 1080 },
+          { name: "4K 2:1", width: 4096, height: 2048 },
+          { name: "3.3K", width: 3328, height: 2790 },
+          { name: "4K 2.39:1 Ana 2x", width: 4096, height: 1716 },
+          { name: "3.8K 2:1 Ana 2x", width: 3840, height: 1920 },
           { name: "3K 1:1", width: 3072, height: 3072 },
+          { name: "4.6K 16:9 (Sensor)", width: 4608, height: 2592 },
+        ],
+      },
+      {
+        name: "ALEXA 265",
+        resolutions: [
+          { name: "6.5K 2.12:1 Open Gate", width: 6560, height: 3100 },
+          { name: "5.1K 1.65:1", width: 5120, height: 3100 },
+          { name: "4.5K LF 3:2", width: 4448, height: 3096 }
         ],
       },
       {
         name: "ALEXA Mini LF",
         resolutions: [
-          { name: "4.5K LF Open Gate", width: 4448, height: 3096 },
-          { name: "4.5K LF 2.39:1", width: 4448, height: 1856 },
-          { name: "UHD LF 16:9", width: 3840, height: 2160 },
+          { name: "4.5K LF Open Gate (4480x3096)", width: 4480, height: 3096 },
+          { name: "4.5K LF 2.39:1 (4480x1856)", width: 4480, height: 1856 },
+          { name: "3.8K LF 16:9 UHD (3840x2160)", width: 3840, height: 2160 },
+          { name: "2.8K S35 16:9 HD (1920x1080)", width: 1920, height: 1080 },
+          { name: "2.8K S35 4:3 2.8K (3072x2160)", width: 3072, height: 2160 },
+          { name: "3.2K S35 16:9 3.2K (3200x1800)", width: 3200, height: 1800 },
+          { name: "3.4K S35 3:2 3.4K (3424x2202)", width: 3424, height: 2202 },
+          { name: "2.8K LF 1:1 2.8K (3072x2880)", width: 3072, height: 2880 },
+          { name: "3.8K LF 16:9 HD (1920x1080)", width: 1920, height: 1080 },
+          { name: "3.8K LF 16:9 2K (2048x1152)", width: 2048, height: 1152 },
+          { name: "4.3K LF 16:9 HD (1920x1080)", width: 1920, height: 1080 },
+          { name: "4.3K LF 16:9 UHD (3840x2160)", width: 3840, height: 2160 },
+        ],
+      },
+      {
+        name: "ALEXA Mini",
+        resolutions: [
+          { name: "Open Gate 3.4K ARRIRAW", width: 3424, height: 2202 },
+          { name: "4:3 2.8K ARRIRAW (OG 3.4K)", width: 2880, height: 2160 },
+          { name: "2.8K ARRIRAW", width: 2880, height: 1620 },
+          { name: "3.2K ProRes", width: 3200, height: 1800 },
+          { name: "4:3 2.8K ProRes", width: 2944, height: 2160 },
+          { name: "2.39:1 2K Ana. ProRes", width: 2048, height: 858 },
+          { name: "2K ProRes", width: 2048, height: 1152 },
+          { name: "HD Ana. ProRes", width: 1920, height: 1080 },
+          { name: "HD ProRes", width: 1920, height: 1080 },
+          { name: "S16 HD ProRes", width: 1920, height: 1080 },
+          { name: "4K UHD ProRes (from 3.2K Sensor)", width: 3840, height: 2160 },
+        ],
+      },
+      {
+        name: "ALEXA 65",
+        resolutions: [
+          { name: "Open Gate 6.5K", width: 6560, height: 3100 },
+          { name: "5.1K", width: 5120, height: 2880 },
+          { name: "LF Open Gate (on 65)", width: 4448, height: 3096 },
+          { name: "4.3K", width: 4320, height: 2880 },
+          { name: "4K UHD (on 65)", width: 3840, height: 2160 },
+        ],
+      },
+      {
+        name: "ALEXA LF",
+        resolutions: [
+          { name: "OG 4.5K", width: 4480, height: 3096 },
+          { name: "Scope 4.5K", width: 4480, height: 1856 },
+          { name: "4K UHD", width: 3840, height: 2160 },
+          { name: "2K", width: 2048, height: 1152 },
+          { name: "HD", width: 1920, height: 1080 },
+        ],
+      },
+      {
+        name: "ALEXA SXT",
+        resolutions: [
+          { name: "ARRIRAW 3.4K Open Gate", width: 3424, height: 2202 },
+          { name: "ARRIRAW 2.8K 4:3", width: 2880, height: 2160 },
+          { name: "ARRIRAW 2.8K 16:9", width: 2880, height: 1620 },
+          { name: "ProRes 4K Cine", width: 4096, height: 2636 },
+          { name: "ProRes 3.4K Open Gate", width: 3424, height: 2202 },
+          { name: "ProRes 3.2K 16:9", width: 3200, height: 1800 },
+          { name: "ProRes 4:3 2.8K", width: 2880, height: 2160 },
+          { name: "ProRes 2K Anamorphic", width: 2048, height: 858 },
+          { name: "ProRes 4K UHD", width: 3840, height: 2160 },
+          { name: "ProRes 2K 16:9", width: 2048, height: 1152 },
+          { name: "ProRes HD 16:9", width: 1920, height: 1080 },
+        ],
+      },
+      {
+        name: "ALEXA XT",
+        resolutions: [
+          { name: "ARRIRAW Open Gate", width: 3414, height: 2198 },
+          { name: "ARRIRAW 4:3 Full", width: 2880, height: 2160 },
+          { name: "ARRIRAW 4:3 Cropped", width: 2578, height: 2160 },
+          { name: "ARRIRAW 16:9 2.8K", width: 2880, height: 1620 },
+          { name: "ProRes 3.2K 16:9", width: 3164, height: 1778 },
+          { name: "ProRes 4:3 2K", width: 2048, height: 1536 },
+          { name: "ProRes 16:9 2K", width: 2048, height: 1152 },
+          { name: "ProRes HD 16:9", width: 1920, height: 1080 },
+        ],
+      },
+      {
+        name: "ALEXA Classic",
+        resolutions: [
+          { name: "ARRIRAW 2.8K 4:3", width: 2880, height: 2160 },
+          { name: "ARRIRAW 2.8K 16:9", width: 2880, height: 1620 },
+          { name: "ProRes 2K 4:3", width: 2048, height: 1536 },
+          { name: "ProRes 2K 16:9", width: 2048, height: 1152 },
+          { name: "ProRes HD 16:9", width: 1920, height: 1080 },
+        ],
+      },
+      {
+        name: "Amira",
+        resolutions: [
+          { name: "HD MPEG-2 (Amira Only)", width: 1920, height: 1080 },
+          { name: "3.2K ProRes", width: 3200, height: 1800 },
+          { name: "4K UHD ProRes (from 3.2K Sensor)", width: 3840, height: 2160 },
+          { name: "2K ProRes", width: 2048, height: 1152 },
+          { name: "HD ProRes", width: 1920, height: 1080 },
         ],
       },
     ],
@@ -144,6 +252,69 @@ const CAMERA_DATA: CameraManufacturer[] = [
           { name: "2K 2:1", width: 2048, height: 1024 },
           { name: "2K 2.4:1", width: 2048, height: 858 },
           { name: "2K 16:9", width: 1920, height: 1080 },
+        ],
+      },
+      {
+        name: "V-Raptor 8K VV (Spherical)",
+        resolutions: [
+          { name: "8K 17:9", width: 8192, height: 4320 },
+          { name: "8K 2:1", width: 8192, height: 4096 },
+          { name: "8K 2.4:1", width: 8192, height: 3456 },
+          { name: "8K 16:9", width: 7680, height: 4320 },
+          { name: "7K 17:9", width: 7168, height: 3780 },
+          { name: "7K 2:1", width: 7168, height: 3584 },
+          { name: "7K 2.4:1", width: 7168, height: 3024 },
+          { name: "7K 16:9", width: 6720, height: 3780 },
+          { name: "6K 17:9", width: 6144, height: 3240 },
+          { name: "6K 2:1", width: 6144, height: 3072 },
+          { name: "6K 2.4:1", width: 6144, height: 2592 },
+          { name: "6K 16:9", width: 5760, height: 3240 },
+          { name: "5K 17:9", width: 5120, height: 2700 },
+          { name: "5K 2:1", width: 5120, height: 2560 },
+          { name: "5K 2.4:1", width: 5120, height: 2160 },
+          { name: "5K 16:9", width: 4800, height: 2700 },
+          { name: "4K 17:9", width: 4096, height: 2160 },
+          { name: "4K 2:1", width: 4096, height: 2048 },
+          { name: "4K 2.4:1", width: 4096, height: 1716 },
+          { name: "4K 16:9", width: 3840, height: 2160 },
+          { name: "3K 17:9", width: 3072, height: 1620 },
+          { name: "3K 2:1", width: 3072, height: 1536 },
+          { name: "3K 2.4:1", width: 3072, height: 1286 },
+          { name: "3K 16:9", width: 2880, height: 1620 },
+          { name: "2K 17:9", width: 2048, height: 1080 },
+          { name: "2K 2:1", width: 2048, height: 1024 },
+          { name: "2K 2.4:1", width: 2048, height: 858 },
+          { name: "2K 16:9", width: 1920, height: 1080 },
+        ],
+      },
+      {
+        name: "V-Raptor 8K VV (Anamorphic)",
+        resolutions: [
+          { name: "8K 4:3 2X", width: 5760, height: 4320 },
+          { name: "8K 6:5 2X", width: 5184, height: 4320 },
+          { name: "8K 1:1 2X", width: 4320, height: 4320 },
+          { name: "8K 3:2 1.8X", width: 6480, height: 4320 },
+          { name: "8K 4:3 1.8X", width: 5758, height: 4320 },
+          { name: "8K 3:2 1.6X", width: 6480, height: 4320 },
+          { name: "8K 16:9 1.5X", width: 7680, height: 4320 },
+          { name: "8K 17:9 1.3X", width: 8192, height: 4320 },
+          { name: "8K 16:9 1.3X", width: 7680, height: 4320 },
+          { name: "8K 17:9 1.25X", width: 8192, height: 4320 },
+        ],
+      },
+      {
+        name: "V-Raptor 7K-6K S35 (Anamorphic)",
+        resolutions: [
+          { name: "7K 4:3 2X", width: 5040, height: 3780 },
+          { name: "7K 6:5 2X", width: 4536, height: 3780 },
+          { name: "7K 1:1 2X", width: 3780, height: 3780 },
+          { name: "7K 3:2 1.8X", width: 5670, height: 3780 },
+          { name: "7K 4:3 1.8X", width: 5040, height: 3780 },
+          { name: "6K 3:2 1.8X", width: 5670, height: 3240 },
+          { name: "6K 4:3 1.8X", width: 5040, height: 3240 },
+          { name: "6K 17:9 1.3X", width: 6144, height: 3240 },
+          { name: "6K 2:1 1.3X", width: 6144, height: 3072 },
+          { name: "6K 16:9 1.3X", width: 5760, height: 3240 },
         ],
       },
       // Future RED models can be added here
@@ -392,28 +563,47 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                     <label htmlFor={`model-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Model</label>
                     <select
                       id={`model-${contextIndex}`}
-                      key={`model-select-${context.meta?.manufacturer || 'none'}-${contextIndex}`}
+                      key={`model-select-${context.meta?.manufacturer || 'none'}-${context.meta?.model || 'none_model'}-${contextIndex}`}
                       value={context.meta?.model || ''}
                       disabled={!currentManufacturer}
                       onChange={(e) => {
                         const newModelName = e.target.value;
-                        const manufacturer = CAMERA_DATA.find(m => m.name === context.meta?.manufacturer);
-                        const model = manufacturer?.models.find(mod => mod.name === newModelName);
-                        const resolution = model?.resolutions[0];
-                        
-                        updateContext(contextIndex, { 
-                          meta: { 
-                            ...(context.meta || {}), 
-                            model: newModelName 
+                        const currentMetaManufacturer = context.meta?.manufacturer;
+
+                        const manufacturerData = CAMERA_DATA.find(m => m.name === currentMetaManufacturer);
+                        const modelData = manufacturerData?.models.find(mod => mod.name === newModelName);
+                        const firstResolution = modelData?.resolutions[0];
+
+                        const newContexts = (fdl.contexts || []).map((ctx, idx) => {
+                          if (idx === contextIndex) {
+                            const updatedCtx = { ...ctx };
+                            // Update meta with new model name
+                            updatedCtx.meta = { 
+                              ...(ctx.meta || {}), 
+                              manufacturer: currentMetaManufacturer, // Keep current manufacturer
+                              model: newModelName 
+                            };
+
+                            // Update canvas dimensions based on the new model's first resolution
+                            if (updatedCtx.canvases && updatedCtx.canvases.length > 0) {
+                              const updatedPrimaryCanvas = { ...updatedCtx.canvases[0] };
+                              if (firstResolution) {
+                                updatedPrimaryCanvas.dimensions = { width: firstResolution.width, height: firstResolution.height };
+                                updatedPrimaryCanvas.effective_dimensions = { width: firstResolution.width, height: firstResolution.height };
+                                updatedPrimaryCanvas.photosite_dimensions = { width: firstResolution.width, height: firstResolution.height };
+                              } else {
+                                // New model has no resolutions, reset canvas dimensions
+                                updatedPrimaryCanvas.dimensions = { width: 0, height: 0 };
+                                updatedPrimaryCanvas.effective_dimensions = { width: 0, height: 0 };
+                                updatedPrimaryCanvas.photosite_dimensions = { width: 0, height: 0 };
+                              }
+                              updatedCtx.canvases = [updatedPrimaryCanvas, ...updatedCtx.canvases.slice(1)];
+                            }
+                            return updatedCtx;
                           }
+                          return ctx;
                         });
-                         if (resolution && primaryCanvas) {
-                           updateCanvas(contextIndex, 0, { 
-                            dimensions: { width: resolution.width, height: resolution.height },
-                            effective_dimensions: { width: resolution.width, height: resolution.height },
-                            photosite_dimensions: { width: resolution.width, height: resolution.height },
-                           });
-                        }
+                        updateFDL({ contexts: newContexts });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >

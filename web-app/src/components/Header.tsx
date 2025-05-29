@@ -4,9 +4,11 @@ interface HeaderProps {
   onExport: () => void;
   onImport: (file: File) => void;
   isValid: boolean;
+  onToggleTestDataViewer: () => void;
+  isTestDataViewerVisible: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onExport, onImport, isValid }) => {
+const Header: React.FC<HeaderProps> = ({ onExport, onImport, isValid, onToggleTestDataViewer, isTestDataViewerVisible }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -44,6 +46,13 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport, isValid }) => {
 
           {/* Actions */}
           <div className="flex items-center space-x-4">
+            {/* <button
+              onClick={onToggleTestDataViewer}
+              className="fdl-button-secondary"
+            >
+              {isTestDataViewerVisible ? 'Hide Test Data' : 'Test'}
+            </button> */}
+
             <button
               onClick={handleImportClick}
               className="fdl-button-secondary"

@@ -1,0 +1,6 @@
+Recording Codec,Recording Format,Sensor Active Image Area (photosites),Recording File Container Size (pixel),Recording File Image Content (pixel),Sensor Image Area (mm),Sensor Image Area (inch),Image Circle (mm),Image Circle (inch),Frame Size in MB,Frame Size in Byte,Max FPS
+ARRIRAW,4K UHD,3840 x 2160,3840 x 2160,3840 x 2160,31.68 x 17.82,1.247 x 0.702,36.35,1.431,12.7,12.661.672,60
+ARRIRAW,4.3K,4320 x 2880,4320 x 2880,4320 x 2880,35.64 x 23.76,1.403 x 0.935,42.83,1.686,18.7,18.882.472,60
+ARRIRAW,LF Open Gate,4448 x 3096,4448 x 3096,4448 x 3096,36.70 x 25.54,1.44 x 1.01,44.7,1.76,20.9,20.876.584,60
+ARRIRAW,5.1K,5120 x 2880,5120 x 2880,5120 x 2880,42.24 x 23.76,1.663 x 0.935,48.46,1.908,22.1,22.338.472,60
+ARRIRAW,Open Gate,6560 x 3100,6560 x 3100,6560 x 3100,54.12 x 25.58,2.131 x 1.007,59.86,2.357,30.5,30.724.072,60

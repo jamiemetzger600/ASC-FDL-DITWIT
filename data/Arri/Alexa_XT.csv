@@ -1,0 +1,10 @@
+Recording Codec,Recording Format,Sensor Active Image Area (photosites),Recording File Container Size (pixel),Recording File Image Content (pixel),Sensor Image Area (mm),Sensor Image Area (inch),Image Circle (mm),Image Circle (inch),Frame Size in MB,Frame Size in Byte,Max FPS
+DNxHD,HD (1920x1080),2880 x 1620,1920 x 1080,1920 x 1080,23.76 x 13.37,0.935 x 0.526,27.26,1.073,-,-,120
+ProRes,HD (1920x1080),2880 x 1620,1920 x 1080,1920 x 1080,23.76 x 13.37,0.935 x 0.526,27.26,1.073,-,-,120
+ProRes,2K (2048x1152),2868 x 1614,2048 x 1152,2048 x 1152,23.66 x 13.32,0.932 x 0.524,27.15,1.069,-,-,60
+ProRes,3.2K (3164x1778),3164 x 1782,3200 x 1782,3164 x 1778,26.14 x 14.70,1.029 x 0.579,29.99,1.181,-,-,30
+ARRIRAW,2.8K,2880 x 1620,2880 x 1620,2880 x 1620,23.76 x 13.37,0.935 x 0.526,27.26,1.073,7.0,7.008.640,120
+ProRes,2K (2048x1536),2868 x 2152,2048 x 1536,2048 x 1536,23.66 x 17.75,0.932 x 0.699,29.58,1.165,-,-,48
+ARRIRAW,Cropped,2592 x 2160,2592 x 2160,2578 x 2160,21.27 x 17.82,0.837 x 0.702,27.75,1.092,8.4,8.402.176,96
+ARRIRAW,Full,2880 x 2160,2880 x 2160,2880 x 2160,23.76 x 17.82,0.935 x 0.702,29.70,1.169,9.3,9.341.440,90
+ARRIRAW,OpenGate,3424 x 2202,3424 x 2202,3414 x 2198,28.25 x 18.17,1.112 x 0.715,33.59,1.322,11.3,11.319.712,75

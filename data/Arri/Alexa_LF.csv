@@ -1,0 +1,9 @@
+Recording Codec,Recording Format,Sensor Active Image Area (photosites),Recording File Container Size (pixel),Recording File Image Content (pixel),Sensor Image Area (mm),Sensor Image Area (inch),Image Circle (mm),Image Circle (inch),Frame Size in MB,Frame Size in Byte,Max FPS
+ProRes,HD,3840 x 2160,1920 x 1080,1920 x 1080,31.68 x 17.82,1.247 x 0.702,36.35,1.431,-,-,60
+ProRes,2K,3840 x 2160,2048 x 1152,2048 x 1152,31.68 x 17.82,1.247 x 0.702,36.35,1.431,-,-,60
+ProRes,4K UHD,3840 x 2160,3840 x 2160,3840 x 2160,31.68 x 17.82,1.247 x 0.702,36.35,1.431,-,-,60/40
+ARRIRAW,4K UHD,3840 x 2160,3840 x 2160,3840 x 2160,31.68 x 17.82,1.247 x 0.702,36.35,1.431,12.7,12.661.672,90
+ProRes,Scope 4.5K,4448 x 1856,4480 x 1856,4448 x 1856,36.70 x 15.31,1.445 x 0.603,39.76,1.565,-,-,100
+ARRIRAW,Scope 4.5K,4448 x 1856,4448 x 1856,4448 x 1856,36.70 x 15.31,1.445 x 0.603,39.76,1.565,12.6,12.603.304,150
+ProRes,OG 4.5K,4448 x 3096,4480 x 3096,4448 x 3096,36.70 x 25.54,1.445 x 1.006,44.71,1.760,-,-,60
+ARRIRAW,OG 4.5K,4448 x 3096,4448 x 3096,4448 x 3096,36.70 x 25.54,1.445 x 1.006,44.71,1.760,20.9,20.876.584,90

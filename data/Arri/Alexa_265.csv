@@ -1,0 +1,4 @@
+Recording Codec,Recording Format,Sensor Active Image Area (photosites),Recording File Container Size (pixel),Recording File Image Content (pixel),Sensor Image Area (mm),Sensor Image Area (inch),Image Circle (mm),Image Circle (inch),Frame Size in MB,Frame Size in Byte,Max FPS
+ARRIRAW,6.5K 2.12:1 Open Gate,6560 x 3100,6560 x 3100,6560 x 3100,54.12 x 25.58,2.130 x 1.007,,,,,
+ARRIRAW,5.1K 1.65:1,5120 x 3100,5120 x 3100,5120 x 3100,42.24 x 25.58,1.663 x 1.007,,,,,
+ARRIRAW,4.5K LF 3:2,4448 x 3096,4448 x 3096,4448 x 3096,36.70 x 25.54,1.445 x 1.006,,,,,
