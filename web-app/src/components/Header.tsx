@@ -4,11 +4,11 @@ interface HeaderProps {
   onExport: () => void;
   onImport: (file: File) => void;
   isValid: boolean;
-  onToggleTestDataViewer: () => void;
-  isTestDataViewerVisible: boolean;
+  // onToggleTestDataViewer: () => void;
+  // isTestDataViewerVisible: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onExport, onImport, isValid, onToggleTestDataViewer, isTestDataViewerVisible }) => {
+const Header: React.FC<HeaderProps> = ({ onExport, onImport, isValid }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport, isValid, onToggleTe
           {/* Logo/Title */}
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-semibold text-gray-900">
-              ASC FDL Editor
+              ASC-DIT-FDL
             </h1>
             <div className={`px-2 py-1 rounded text-xs font-medium ${
               isValid 

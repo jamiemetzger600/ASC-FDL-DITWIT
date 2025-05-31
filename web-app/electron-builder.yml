@@ -1,0 +1,23 @@
+appId: com.example.ditwit
+productName: ASC-DIT-FDL
+copyright: Copyright © 2024 YourName
+
+files:
+  - filter:
+    - dist/**/*
+    - public/electron.js
+    - public/preload.js
+
+mac:
+  target:
+    - dmg
+    - zip
+  icon: build/icon.icns # Placeholder, replace if you have an icon
+  category: public.app-category.developer-tools # Or another appropriate category
+
+directories:
+  output: release # Where to put the packaged app
+  buildResources: build # Directory for icons and other build resources
+
+# Ensure electron.js is treated as the main entry point
+# main: public/electron.js 
