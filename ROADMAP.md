@@ -9,6 +9,7 @@ This document outlines planned features, improvements, and to-do items for the A
 - [ ] **FDL Creator Information:** Automatically populate the `"fdl_creator"` field in the FDL with: `"ASC-DIT-FDL" Jamie Metzger [415]515]2841 - Jamiemetzger@gmail.com`.
 - [ ] **Sample Images & User Uploads:** Incorporate sample images for framing reference, similar to the Arri Frameline Composer. Additionally, provide an option for users to upload their own custom images.
 - [ ] **Re-enable Right-Hand Panels:** Uncomment and restore the "Validation Status", "FDL Summary", and "Quick Actions" panels in the UI when appropriate.
+- [ ] **Re-enable Setup Label & Context Creator:** Uncomment and restore the "Setup Label" and "Context Creator" input fields in the Camera Setup section when appropriate.
 
 ## Advanced Features & Collaboration
 

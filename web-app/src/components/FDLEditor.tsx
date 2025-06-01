@@ -754,8 +754,8 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                 )}
               </div>
 
-              {/* Setup Label & Context Creator - MOVED DOWN */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"> {/* Added mt-4 for spacing */}
+              {/* Setup Label & Context Creator - MOVED DOWN - TEMPORARILY HIDDEN*/}
+              {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"> 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Setup Label
@@ -780,7 +780,7 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                     placeholder="Optional creator"
                   />
                 </div>
-              </div>
+              </div> */}
 
             </div>
             )
