@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import type { FDL, FramingIntent, Context, Canvas, FDLDimensions as Dimensions, FDLPoint } from '../types/fdl';
-import { generateFDLId, generateUUID } from '../validation/fdlValidator';
+import type { FDL, FramingIntent, Context, Canvas } from '../types/fdl';
+import { generateFDLId } from '../validation/fdlValidator';
 import { COMMON_ASPECT_RATIOS } from '../types/fdl';
 import FDLVisualizer from './FDLVisualizer';
 
@@ -323,8 +323,6 @@ const CAMERA_DATA: CameraManufacturer[] = [
 ];
 
 const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
-  const [selectedManufacturer, setSelectedManufacturer] = useState<string>(CAMERA_DATA[0]?.name || '');
-  const [selectedModel, setSelectedModel] = useState<string>(CAMERA_DATA[0]?.models[0]?.name || '');
   const [advancedSettingsVisible, setAdvancedSettingsVisible] = useState<boolean[]>([]);
   const [visualizedContextIndex, setVisualizedContextIndex] = useState<number | null>(null);
 
@@ -484,34 +482,7 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Setup Label
-                  </label>
-                  <input
-                    type="text"
-                    value={context.label || ''}
-                    onChange={(e) => updateContext(contextIndex, { label: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., A-Cam, Scene 5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Context Creator
-                  </label>
-                  <input
-                    type="text"
-                    value={context.context_creator || ''}
-                    onChange={(e) => updateContext(contextIndex, { context_creator: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Optional creator"
-                  />
-                </div>
-              </div>
-              
-              {/* Camera Selection - New Fields */}
+              {/* Canvas Definition - MOVED UP */}
               <div className="bg-gray-50 p-4 rounded-md mb-4 space-y-3">
                 <h4 className="text-md font-medium text-gray-800 mb-2 border-b pb-2">Canvas Definition</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -526,31 +497,29 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                         const newModelName = manufacturer?.models[0]?.name || '';
                         const newResolution = manufacturer?.models[0]?.resolutions[0];
 
-                        // Get the current contexts array from the fdl prop
                         const originalContexts = [...(fdl.contexts || [])];
-                        // Create a deep copy of the specific context to modify safely
                         const contextToUpdate = JSON.parse(JSON.stringify(originalContexts[contextIndex]));
 
-                        // Update its meta
                         contextToUpdate.meta = {
                           manufacturer: newManufacturerName,
                           model: newModelName,
                         };
 
-                        // If there's a primary canvas and a new resolution, update its dimensions too
                         if (newResolution && contextToUpdate.canvases && contextToUpdate.canvases.length > 0) {
                           const primaryCanvasToUpdate = contextToUpdate.canvases[0];
                           primaryCanvasToUpdate.dimensions = { width: newResolution.width, height: newResolution.height };
                           primaryCanvasToUpdate.effective_dimensions = { width: newResolution.width, height: newResolution.height };
                           primaryCanvasToUpdate.photosite_dimensions = { width: newResolution.width, height: newResolution.height };
+                          // Clear recording_codec if manufacturer is not ARRI
+                          if (newManufacturerName !== 'ARRI') {
+                            delete primaryCanvasToUpdate.recording_codec;
+                          }
                         }
                         
-                        // Create the final new contexts array
                         const newContextsArray = originalContexts.map((ctx, idx) => 
                           idx === contextIndex ? contextToUpdate : ctx
                         );
 
-                        // Single update to FDL
                         updateFDL({ contexts: newContextsArray });
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -577,14 +546,12 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                         const newContexts = (fdl.contexts || []).map((ctx, idx) => {
                           if (idx === contextIndex) {
                             const updatedCtx = { ...ctx };
-                            // Update meta with new model name
                             updatedCtx.meta = { 
                               ...(ctx.meta || {}), 
-                              manufacturer: currentMetaManufacturer, // Keep current manufacturer
+                              manufacturer: currentMetaManufacturer, 
                               model: newModelName 
                             };
 
-                            // Update canvas dimensions based on the new model's first resolution
                             if (updatedCtx.canvases && updatedCtx.canvases.length > 0) {
                               const updatedPrimaryCanvas = { ...updatedCtx.canvases[0] };
                               if (firstResolution) {
@@ -592,7 +559,6 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                                 updatedPrimaryCanvas.effective_dimensions = { width: firstResolution.width, height: firstResolution.height };
                                 updatedPrimaryCanvas.photosite_dimensions = { width: firstResolution.width, height: firstResolution.height };
                               } else {
-                                // New model has no resolutions, reset canvas dimensions
                                 updatedPrimaryCanvas.dimensions = { width: 0, height: 0 };
                                 updatedPrimaryCanvas.effective_dimensions = { width: 0, height: 0 };
                                 updatedPrimaryCanvas.photosite_dimensions = { width: 0, height: 0 };
@@ -639,7 +605,47 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                   </div>
                 </div>
 
-                {/* Primary Canvas Details */}
+                {/* New Row for Anamorphic Squeeze and Recording Codec */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3"> {/* Added mt-3 for spacing */}
+                  <div>
+                    <label htmlFor={`anamorphic-squeeze-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Anamorphic Squeeze</label>
+                    <select
+                      id={`anamorphic-squeeze-${contextIndex}`}
+                      value={primaryCanvas?.anamorphic_squeeze || 1.0} // Default to 1.0 if not set
+                      onChange={(e) => {
+                        if (primaryCanvas) {
+                          updateCanvas(contextIndex, 0, { anamorphic_squeeze: parseFloat(e.target.value) });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {[1.0, 1.25, 1.30, 1.33, 1.5, 1.65, 1.8, 1.85, 2.0].map(val => (
+                        <option key={val} value={val}>{val.toFixed(2)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {context.meta?.manufacturer === 'ARRI' && (
+                    <div>
+                      <label htmlFor={`recording-codec-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Recording Codec</label>
+                      <select
+                        id={`recording-codec-${contextIndex}`}
+                        value={primaryCanvas?.recording_codec || ''}
+                        onChange={(e) => {
+                          if (primaryCanvas) {
+                            updateCanvas(contextIndex, 0, { recording_codec: e.target.value });
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select Codec</option>
+                        <option value="Apple ProRes">Apple ProRes</option>
+                        <option value="ARRIRAW">ARRIRAW</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Primary Canvas Details */} 
                 {primaryCanvas && (
                   <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
                      <div>
@@ -742,17 +748,40 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                           </div>
                         </div>
                         
-                        {/* Anamorphic Squeeze */}
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Anamorphic Squeeze</label>
-                          <input type="number" step="0.01" value={primaryCanvas.anamorphic_squeeze || ''} onChange={(e) => updateCanvas(contextIndex, 0, { anamorphic_squeeze: Number(e.target.value) })} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                        </div>
-
                       </div>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* Setup Label & Context Creator - MOVED DOWN */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"> {/* Added mt-4 for spacing */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Setup Label
+                  </label>
+                  <input
+                    type="text"
+                    value={context.label || ''}
+                    onChange={(e) => updateContext(contextIndex, { label: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., A-Cam, Scene 5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Context Creator
+                  </label>
+                  <input
+                    type="text"
+                    value={context.context_creator || ''}
+                    onChange={(e) => updateContext(contextIndex, { context_creator: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Optional creator"
+                  />
+                </div>
+              </div>
+
             </div>
             )
           })}

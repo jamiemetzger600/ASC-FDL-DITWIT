@@ -43,6 +43,7 @@ export interface Canvas {
   photosite_dimensions?: FDLDimensions;
   physical_dimensions?: FDLDimensions;
   anamorphic_squeeze?: number;
+  recording_codec?: string;
   framing_decisions: FramingDecision[];
 }
 
