@@ -8,6 +8,7 @@ This document outlines planned features, improvements, and to-do items for the A
 - [ ] **Intuitive Framing Intent Creation:** Redesign the UI/UX for creating Framing Intents to be highly intuitive and user-friendly. Technical information should be hidden by default and revealed upon user request (e.g., via a checkbox or dropdown), allowing users to focus on creating their FDL without technical distractions.
 - [ ] **FDL Creator Information:** Automatically populate the `"fdl_creator"` field in the FDL with: `"ASC-DIT-FDL" Jamie Metzger [415]515]2841 - Jamiemetzger@gmail.com`.
 - [ ] **Sample Images & User Uploads:** Incorporate sample images for framing reference, similar to the Arri Frameline Composer. Additionally, provide an option for users to upload their own custom images.
+- [ ] **Re-enable Right-Hand Panels:** Uncomment and restore the "Validation Status", "FDL Summary", and "Quick Actions" panels in the UI when appropriate.
 
 ## Advanced Features & Collaboration
 

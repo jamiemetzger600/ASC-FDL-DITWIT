@@ -7,12 +7,10 @@ import './App.css';
 import Header from './components/Header';
 import FDLEditor from './components/FDLEditor';
 import ValidationPanel from './components/ValidationPanel.tsx';
-import ExampleCameraDataViewer from './components/ExampleCameraDataViewer';
 
 function App() {
   const [fdl, setFdl] = useState<FDL>(createEmptyFDL());
   const [validationResult, setValidationResult] = useState(validateFDL(fdl));
-  const [showTestDataViewer, setShowTestDataViewer] = useState(false);
 
   const handleFDLChange = (newFdl: FDL) => {
     setFdl(newFdl);
@@ -52,33 +50,27 @@ function App() {
         onExport={handleExport}
         onImport={handleImport}
         isValid={validationResult.isValid}
-        onToggleTestDataViewer={() => setShowTestDataViewer(prev => !prev)}
-        isTestDataViewerVisible={showTestDataViewer}
       />
       
-      {showTestDataViewer ? (
-        <ExampleCameraDataViewer />
-      ) : (
-        <main className="fdl-container py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Editor */}
-            <div className="lg:col-span-2">
-              <FDLEditor 
-                fdl={fdl}
-                onChange={handleFDLChange}
-              />
-            </div>
-            
-            {/* Validation Panel */}
-            <div className="lg:col-span-1">
-              <ValidationPanel 
-                validationResult={validationResult}
-                fdl={fdl}
-              />
-            </div>
+      <main className="fdl-container py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Editor */}
+          <div className="lg:col-span-3">
+            <FDLEditor 
+              fdl={fdl}
+              onChange={handleFDLChange}
+            />
           </div>
-        </main>
-      )}
+          
+          {/* Validation Panel - Temporarily Hidden */}
+          {/* <div className="lg:col-span-1">
+            <ValidationPanel 
+              validationResult={validationResult}
+              fdl={fdl}
+            />
+          </div> */}
+        </div>
+      </main>
     </div>
   );
 }
