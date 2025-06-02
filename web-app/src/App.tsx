@@ -34,10 +34,25 @@ function App() {
       try {
         const result = e.target?.result as string;
         const importedFdl = JSON.parse(result) as FDL;
-        handleFDLChange(importedFdl);
+        
+        // Update the FDL state with the imported data
+        setFdl(importedFdl);
+        
+        // Validate the imported FDL
+        const currentValidationResult = validateFDL(importedFdl);
+        // Update the global validationResult state
+        setValidationResult(currentValidationResult);
+
+        if (!currentValidationResult.isValid) {
+          const errorMessages = currentValidationResult.errors.join('\n- ');
+          alert(`Imported FDL has validation issues. Please address the following:\n- ${errorMessages}`);
+        } else {
+          alert('FDL imported successfully and is valid!'); // Optional: Or remove for less noise
+        }
       } catch (error) {
         console.error('Error importing FDL file:', error);
-        alert('Error importing FDL file. Please check the file format.');
+        // This error typically means the file was not valid JSON or a FileReader issue occurred.
+        alert('Error importing FDL file. Please ensure the file is a correctly formatted JSON FDL file.');
       }
     };
     reader.readAsText(file);

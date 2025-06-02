@@ -26,6 +26,13 @@ interface CameraManufacturer {
   models: CameraModel[];
 }
 
+// Define a type for the new UI state for camera selections
+interface CameraSelection {
+  manufacturer: string;
+  model: string;
+  resolutionName?: string; // Optional, to store the selected resolution name
+}
+
 const CAMERA_DATA: CameraManufacturer[] = [
   {
     name: "ARRI",
@@ -329,8 +336,34 @@ const intentBackgroundOpacity = '40'; // Approx 25% opacity (hex 40)
 const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
   const [advancedSettingsVisible, setAdvancedSettingsVisible] = useState<boolean[]>([]);
   const [visualizedContextIndex, setVisualizedContextIndex] = useState<number | null>(null);
+  
+  // New state for managing camera selections for each context
+  const [cameraSelections, setCameraSelections] = useState<CameraSelection[]>([]);
 
   useEffect(() => {
+    // Initialize or synchronize cameraSelections when fdl.contexts changes
+    const initialSelections = (fdl.contexts || []).map((context, index) => {
+      // Try to find existing selection, otherwise default
+      const existingSelection = cameraSelections[index];
+      if (existingSelection) return existingSelection;
+
+      // If loading an FDL without meta, or for new contexts, set a default.
+      // Here, we default to the first camera/model/resolution in CAMERA_DATA
+      // This might need refinement based on how you want to handle imported FDLs
+      // or if you prefer empty defaults.
+      const defaultManufacturer = CAMERA_DATA[0]?.name || '';
+      const defaultModel = CAMERA_DATA[0]?.models[0]?.name || '';
+      const defaultResolutionName = CAMERA_DATA[0]?.models[0]?.resolutions[0]?.name || '';
+      
+      return {
+        manufacturer: defaultManufacturer,
+        model: defaultModel,
+        resolutionName: defaultResolutionName,
+      };
+    });
+    setCameraSelections(initialSelections);
+
+    // Adjust visualizedContextIndex
     if (fdl.contexts && fdl.contexts.length > 0) {
       if (visualizedContextIndex === null || visualizedContextIndex >= fdl.contexts.length) {
         setVisualizedContextIndex(0);
@@ -338,7 +371,8 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
     } else {
       setVisualizedContextIndex(null);
     }
-  }, [fdl.contexts, visualizedContextIndex]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fdl.contexts]); // Only re-run if fdl.contexts itself changes structure
 
   const updateFDL = (updates: Partial<FDL>) => {
     onChange({ ...fdl, ...updates });
@@ -391,37 +425,48 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
   };
 
   const addContext = () => {
+    const newCanvasId = generateFDLId(`canvas_${Date.now()}`);
+    const defaultManufacturerData = CAMERA_DATA[0];
+    const defaultModelData = defaultManufacturerData?.models[0];
+    const defaultResolutionData = defaultModelData?.resolutions[0];
+
     const defaultCanvas: Canvas = {
-      id: generateFDLId(`canvas_${Date.now()}`),
-      source_canvas_id: generateFDLId(`source_canvas_${Date.now()}`),
+      id: newCanvasId,
+      source_canvas_id: newCanvasId,
       label: 'Primary Capture',
       dimensions: { 
-        width: CAMERA_DATA[0]?.models[0]?.resolutions[0]?.width || 0, 
-        height: CAMERA_DATA[0]?.models[0]?.resolutions[0]?.height || 0 
+        width: defaultResolutionData?.width || 0, 
+        height: defaultResolutionData?.height || 0 
       },
       effective_dimensions: { 
-        width: CAMERA_DATA[0]?.models[0]?.resolutions[0]?.width || 0, 
-        height: CAMERA_DATA[0]?.models[0]?.resolutions[0]?.height || 0 
+        width: defaultResolutionData?.width || 0, 
+        height: defaultResolutionData?.height || 0
       },
       effective_anchor_point: { x: 0, y: 0 },
       photosite_dimensions: { 
-        width: CAMERA_DATA[0]?.models[0]?.resolutions[0]?.width || 0, 
-        height: CAMERA_DATA[0]?.models[0]?.resolutions[0]?.height || 0 
+        width: defaultResolutionData?.width || 0, 
+        height: defaultResolutionData?.height || 0
       },
-      physical_dimensions: { width: 36.70, height: 25.54 },
+      physical_dimensions: { width: 36.70, height: 25.54 }, // General default
       anamorphic_squeeze: 1.0,
       framing_decisions: [],
     };
     const newContext: Context = {
       label: `Camera Setup ${(fdl.contexts?.length || 0) + 1}`,
       canvases: [defaultCanvas],
-      meta: {
-        manufacturer: CAMERA_DATA[0]?.name || '',
-        model: CAMERA_DATA[0]?.models[0]?.name || '',
-      }
     };
-    const newContexts = [...(fdl.contexts || []), newContext];
-    updateFDL({ contexts: newContexts });
+    
+    // Update FDL
+    const newFdlContexts = [...(fdl.contexts || []), newContext];
+    updateFDL({ contexts: newFdlContexts });
+
+    // Update cameraSelections state for the new context
+    setCameraSelections(prev => [...prev, {
+        manufacturer: defaultManufacturerData?.name || '',
+        model: defaultModelData?.name || '',
+        resolutionName: defaultResolutionData?.name || ''
+    }]);
+
     setAdvancedSettingsVisible(prev => [...prev, false]);
     if (visualizedContextIndex === null) {
       setVisualizedContextIndex(0);
@@ -429,24 +474,94 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
   };
 
   const updateCanvas = (contextIndex: number, canvasIndex: number, updates: Partial<Canvas>) => {
-    const newContexts = [...(fdl.contexts || [])];
-    if (newContexts[contextIndex] && newContexts[contextIndex].canvases) {
-      const canvases = [...(newContexts[contextIndex].canvases || [])];
+    const newFdlContexts = [...(fdl.contexts || [])];
+    if (newFdlContexts[contextIndex] && newFdlContexts[contextIndex].canvases) {
+      const canvases = [...(newFdlContexts[contextIndex].canvases || [])];
       canvases[canvasIndex] = { ...canvases[canvasIndex], ...updates };
-      newContexts[contextIndex] = { ...newContexts[contextIndex], canvases };
-      updateFDL({ contexts: newContexts });
+      newFdlContexts[contextIndex] = { ...newFdlContexts[contextIndex], canvases };
+      updateFDL({ contexts: newFdlContexts });
+    }
+  };
+  
+  const handleCameraSelectionChange = (
+    contextIndex: number,
+    type: 'manufacturer' | 'model' | 'resolution',
+    value: string
+  ) => {
+    const newSelections = [...cameraSelections];
+    let currentSelection = { ...newSelections[contextIndex] };
+    let newCanvasProps: Partial<Canvas> = {};
+
+    if (type === 'manufacturer') {
+      currentSelection.manufacturer = value;
+      const manufacturerData = CAMERA_DATA.find(m => m.name === value);
+      currentSelection.model = manufacturerData?.models[0]?.name || '';
+      const modelData = manufacturerData?.models.find(m => m.name === currentSelection.model);
+      currentSelection.resolutionName = modelData?.resolutions[0]?.name || '';
+      const resolutionData = modelData?.resolutions.find(r => r.name === currentSelection.resolutionName);
+      if (resolutionData) {
+        newCanvasProps.dimensions = { width: resolutionData.width, height: resolutionData.height };
+        newCanvasProps.effective_dimensions = { width: resolutionData.width, height: resolutionData.height };
+        newCanvasProps.photosite_dimensions = { width: resolutionData.width, height: resolutionData.height };
+      } else {
+        newCanvasProps.dimensions = { width: 0, height: 0 };
+        newCanvasProps.effective_dimensions = { width: 0, height: 0 };
+        newCanvasProps.photosite_dimensions = { width: 0, height: 0 };
+      }
+
+      if (value === 'ARRI') {
+        newCanvasProps.recording_codec = 'ARRIRAW';
+      } else {
+        newCanvasProps.recording_codec = undefined;
+      }
+
+    } else if (type === 'model') {
+      currentSelection.model = value;
+      const manufacturerData = CAMERA_DATA.find(m => m.name === currentSelection.manufacturer);
+      const modelData = manufacturerData?.models.find(m => m.name === value);
+      currentSelection.resolutionName = modelData?.resolutions[0]?.name || '';
+      const resolutionData = modelData?.resolutions.find(r => r.name === currentSelection.resolutionName);
+      if (resolutionData) {
+        newCanvasProps.dimensions = { width: resolutionData.width, height: resolutionData.height };
+        newCanvasProps.effective_dimensions = { width: resolutionData.width, height: resolutionData.height };
+        newCanvasProps.photosite_dimensions = { width: resolutionData.width, height: resolutionData.height };
+      }
+    } else if (type === 'resolution') {
+      currentSelection.resolutionName = value;
+      const manufacturerData = CAMERA_DATA.find(m => m.name === currentSelection.manufacturer);
+      const modelData = manufacturerData?.models.find(m => m.name === currentSelection.model);
+      const resolutionData = modelData?.resolutions.find(r => r.name === value);
+      if (resolutionData) {
+        newCanvasProps.dimensions = { width: resolutionData.width, height: resolutionData.height };
+        newCanvasProps.effective_dimensions = { width: resolutionData.width, height: resolutionData.height };
+        newCanvasProps.photosite_dimensions = { width: resolutionData.width, height: resolutionData.height };
+      }
+    }
+
+    newSelections[contextIndex] = currentSelection;
+    setCameraSelections(newSelections);
+
+    if (Object.keys(newCanvasProps).length > 0) {
+      updateCanvas(contextIndex, 0, newCanvasProps); // Assuming primary canvas is always at index 0
     }
   };
 
+
   const removeContext = (contextIndexToRemove: number) => {
-    const newContexts = [...(fdl.contexts || [])];
-    newContexts.splice(contextIndexToRemove, 1);
-    updateFDL({ contexts: newContexts });
+    const newFdlContexts = [...(fdl.contexts || [])];
+    newFdlContexts.splice(contextIndexToRemove, 1);
+    updateFDL({ contexts: newFdlContexts });
+
+    // Remove corresponding camera selection
+    const newCameraSelections = [...cameraSelections];
+    newCameraSelections.splice(contextIndexToRemove, 1);
+    setCameraSelections(newCameraSelections);
+
     setAdvancedSettingsVisible(prev => prev.filter((_, i) => i !== contextIndexToRemove));
 
     if (visualizedContextIndex !== null) {
       if (visualizedContextIndex === contextIndexToRemove) {
-        setVisualizedContextIndex(newContexts.length > 0 ? 0 : null);
+        setVisualizedContextIndex(newFdlContexts.length > 0 ? 0 : null);
       } else if (visualizedContextIndex > contextIndexToRemove) {
         setVisualizedContextIndex(visualizedContextIndex - 1);
       }
@@ -474,14 +589,17 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
         </div>
         <div className="space-y-4">
           {(fdl.contexts || []).map((context, contextIndex) => {
-            const currentManufacturer = CAMERA_DATA.find(m => m.name === context.meta?.manufacturer);
-            const currentModel = currentManufacturer?.models.find(mod => mod.name === context.meta?.model);
+            // Derive current manufacturer and model from cameraSelections state
+            const currentSelection = cameraSelections[contextIndex] || { manufacturer: '', model: '', resolutionName: '' };
+            const currentManufacturerData = CAMERA_DATA.find(m => m.name === currentSelection.manufacturer);
+            const currentModelData = currentManufacturerData?.models.find(mod => mod.name === currentSelection.model);
+            
             const primaryCanvas = context.canvases && context.canvases.length > 0 ? context.canvases[0] : null;
 
             return (
-            <div key={contextIndex} className="border border-gray-200 rounded-lg p-4">
+            <div key={contextIndex} className="border border-gray-200 rounded-lg p-4"> {/* Use contextIndex as key */}
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-900">Camera Setup {contextIndex + 1}</h3>
+                <h3 className="font-medium text-gray-900">{context.label || `Camera Setup ${contextIndex + 1}`}</h3>
                 <button
                   onClick={() => removeContext(contextIndex)}
                   className="text-red-600 hover:text-red-800 text-sm"
@@ -498,38 +616,8 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                     <label htmlFor={`manufacturer-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Manufacturer</label>
                     <select
                       id={`manufacturer-${contextIndex}`}
-                      value={context.meta?.manufacturer || ''}
-                      onChange={(e) => {
-                        const newManufacturerName = e.target.value;
-                        const manufacturer = CAMERA_DATA.find(m => m.name === newManufacturerName);
-                        const newModelName = manufacturer?.models[0]?.name || '';
-                        const newResolution = manufacturer?.models[0]?.resolutions[0];
-
-                        const originalContexts = [...(fdl.contexts || [])];
-                        const contextToUpdate = JSON.parse(JSON.stringify(originalContexts[contextIndex]));
-
-                        contextToUpdate.meta = {
-                          manufacturer: newManufacturerName,
-                          model: newModelName,
-                        };
-
-                        if (newResolution && contextToUpdate.canvases && contextToUpdate.canvases.length > 0) {
-                          const primaryCanvasToUpdate = contextToUpdate.canvases[0];
-                          primaryCanvasToUpdate.dimensions = { width: newResolution.width, height: newResolution.height };
-                          primaryCanvasToUpdate.effective_dimensions = { width: newResolution.width, height: newResolution.height };
-                          primaryCanvasToUpdate.photosite_dimensions = { width: newResolution.width, height: newResolution.height };
-                          // Clear recording_codec if manufacturer is not ARRI
-                          if (newManufacturerName !== 'ARRI') {
-                            delete primaryCanvasToUpdate.recording_codec;
-                          }
-                        }
-                        
-                        const newContextsArray = originalContexts.map((ctx, idx) => 
-                          idx === contextIndex ? contextToUpdate : ctx
-                        );
-
-                        updateFDL({ contexts: newContextsArray });
-                      }}
+                      value={currentSelection.manufacturer}
+                      onChange={(e) => handleCameraSelectionChange(contextIndex, 'manufacturer', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Manufacturer</option>
@@ -540,75 +628,28 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                     <label htmlFor={`model-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Model</label>
                     <select
                       id={`model-${contextIndex}`}
-                      key={`model-select-${context.meta?.manufacturer || 'none'}-${context.meta?.model || 'none_model'}-${contextIndex}`}
-                      value={context.meta?.model || ''}
-                      disabled={!currentManufacturer}
-                      onChange={(e) => {
-                        const newModelName = e.target.value;
-                        const currentMetaManufacturer = context.meta?.manufacturer;
-
-                        const manufacturerData = CAMERA_DATA.find(m => m.name === currentMetaManufacturer);
-                        const modelData = manufacturerData?.models.find(mod => mod.name === newModelName);
-                        const firstResolution = modelData?.resolutions[0];
-
-                        const newContexts = (fdl.contexts || []).map((ctx, idx) => {
-                          if (idx === contextIndex) {
-                            const updatedCtx = { ...ctx };
-                            updatedCtx.meta = { 
-                              ...(ctx.meta || {}), 
-                              manufacturer: currentMetaManufacturer, 
-                              model: newModelName 
-                            };
-
-                            if (updatedCtx.canvases && updatedCtx.canvases.length > 0) {
-                              const updatedPrimaryCanvas = { ...updatedCtx.canvases[0] };
-                              if (firstResolution) {
-                                updatedPrimaryCanvas.dimensions = { width: firstResolution.width, height: firstResolution.height };
-                                updatedPrimaryCanvas.effective_dimensions = { width: firstResolution.width, height: firstResolution.height };
-                                updatedPrimaryCanvas.photosite_dimensions = { width: firstResolution.width, height: firstResolution.height };
-                              } else {
-                                updatedPrimaryCanvas.dimensions = { width: 0, height: 0 };
-                                updatedPrimaryCanvas.effective_dimensions = { width: 0, height: 0 };
-                                updatedPrimaryCanvas.photosite_dimensions = { width: 0, height: 0 };
-                              }
-                              updatedCtx.canvases = [updatedPrimaryCanvas, ...updatedCtx.canvases.slice(1)];
-                            }
-                            return updatedCtx;
-                          }
-                          return ctx;
-                        });
-                        updateFDL({ contexts: newContexts });
-                      }}
+                      key={`model-select-${currentSelection.manufacturer}-${currentSelection.model}-${contextIndex}`} // Key for re-render
+                      value={currentSelection.model}
+                      disabled={!currentManufacturerData}
+                      onChange={(e) => handleCameraSelectionChange(contextIndex, 'model', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Model</option>
-                      {currentManufacturer?.models.map(mod => <option key={mod.name} value={mod.name}>{mod.name}</option>)}   
+                      {currentManufacturerData?.models.map(mod => <option key={mod.name} value={mod.name}>{mod.name}</option>)}   
                     </select>
                   </div>
                   <div>
                     <label htmlFor={`resolution-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Sensor Mode/Resolution</label>
                     <select
                       id={`resolution-${contextIndex}`}
-                      key={`resolution-select-${context.meta?.model || 'none'}-${contextIndex}`}
-                      disabled={!currentModel}
-                      value={primaryCanvas?.dimensions && currentModel?.resolutions.find(r => r.width === primaryCanvas.dimensions.width && r.height === primaryCanvas.dimensions.height)?.name || ''}
-                      onChange={(e) => {
-                        const selectedResName = e.target.value;
-                        const manufacturer = CAMERA_DATA.find(m => m.name === context.meta?.manufacturer);
-                        const model = manufacturer?.models.find(mod => mod.name === context.meta?.model);
-                        const newResolution = model?.resolutions.find(r => r.name === selectedResName);
-                        if (newResolution && primaryCanvas) {
-                          updateCanvas(contextIndex, 0, { 
-                            dimensions: { width: newResolution.width, height: newResolution.height },
-                            effective_dimensions: { width: newResolution.width, height: newResolution.height },
-                            photosite_dimensions: { width: newResolution.width, height: newResolution.height },
-                          });
-                        }
-                      }}
+                      key={`resolution-select-${currentSelection.model}-${contextIndex}`} // Key for re-render
+                      disabled={!currentModelData}
+                      value={currentSelection.resolutionName || ''}
+                      onChange={(e) => handleCameraSelectionChange(contextIndex, 'resolution', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Resolution</option>
-                      {currentModel?.resolutions.map(res => <option key={res.name} value={res.name}>{res.name} ({res.width}x{res.height})</option>)} 
+                      {currentModelData?.resolutions.map(res => <option key={res.name} value={res.name}>{res.name} ({res.width}x{res.height})</option>)} 
                     </select>
                   </div>
                 </div>
@@ -632,7 +673,7 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                       ))}
                     </select>
                   </div>
-                  {context.meta?.manufacturer === 'ARRI' && (
+                  {currentSelection.manufacturer === 'ARRI' && ( // Use cameraSelections for conditional rendering
                     <div>
                       <label htmlFor={`recording-codec-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Recording Codec</label>
                       <select
@@ -658,7 +699,25 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                   <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
                      <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Canvas Label
+                          Context Label (Internal Use)
+                        </label>
+                        <input
+                          type="text"
+                          value={context.label || ''}
+                          onChange={(e) => {
+                            const newContexts = [...(fdl.contexts || [])];
+                            if(newContexts[contextIndex]) {
+                                newContexts[contextIndex] = {...newContexts[contextIndex], label: e.target.value };
+                                updateFDL({contexts: newContexts});
+                            }
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="e.g., A-Cam, Scene 5 Setup"
+                        />
+                      </div>
+                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Canvas Label (FDL Spec)
                         </label>
                         <input
                           type="text"
@@ -761,35 +820,6 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
                   </div>
                 )}
               </div>
-
-              {/* Setup Label & Context Creator - MOVED DOWN - TEMPORARILY HIDDEN*/}
-              {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"> 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Setup Label
-                  </label>
-                  <input
-                    type="text"
-                    value={context.label || ''}
-                    onChange={(e) => updateContext(contextIndex, { label: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., A-Cam, Scene 5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Context Creator
-                  </label>
-                  <input
-                    type="text"
-                    value={context.context_creator || ''}
-                    onChange={(e) => updateContext(contextIndex, { context_creator: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Optional creator"
-                  />
-                </div>
-              </div> */}
-
             </div>
             )
           })}
@@ -971,12 +1001,15 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
             onChange={(e) => setVisualizedContextIndex(e.target.value === '' ? null : Number(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {(fdl.contexts || []).map((context, index) => (
-              <option key={`vis-ctx-${index}`} value={index}>
-                {context.label || `Camera Setup ${index + 1}`}
-                {context.meta?.model ? ` (${context.meta.manufacturer} ${context.meta.model})` : ''}
-              </option>
-            ))}
+            {(fdl.contexts || []).map((context, index) => {
+              const selection = cameraSelections[index] || { manufacturer: '', model: '' };
+              return (
+                <option key={`vis-ctx-${index}`} value={index}>
+                  {context.label || `Camera Setup ${index + 1}`}
+                  {selection.model ? ` (${selection.manufacturer} ${selection.model})` : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
       )}
