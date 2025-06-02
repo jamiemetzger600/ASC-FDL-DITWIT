@@ -122,10 +122,15 @@ export interface FormErrors {
 
 // Common aspect ratios for quick selection
 export const COMMON_ASPECT_RATIOS = [
-  { label: '16:9 (1.78:1)', ratio: { width: 16, height: 9 } },
-  { label: '4:3 (1.33:1)', ratio: { width: 4, height: 3 } },
-  { label: '21:9 (2.35:1)', ratio: { width: 21, height: 9 } },
+  { label: '1.33:1 (4:3)', ratio: { width: 4, height: 3 } },
+  { label: '1.43:1', ratio: { width: 143, height: 100 } },
+  { label: '1.66:1 (5:3)', ratio: { width: 5, height: 3 } },
+  { label: '1.78:1 (16:9)', ratio: { width: 16, height: 9 } },
   { label: '1.85:1', ratio: { width: 185, height: 100 } },
+  { label: '1.90:1 (19:10)', ratio: { width: 19, height: 10 } },
+  { label: '2.00:1 (2:1)', ratio: { width: 2, height: 1 } },
+  { label: '2.20:1 (11:5)', ratio: { width: 11, height: 5 } },
+  { label: '2.35:1', ratio: { width: 235, height: 100 } },
   { label: '2.39:1', ratio: { width: 239, height: 100 } },
   { label: '1:1 (Square)', ratio: { width: 1, height: 1 } },
   { label: '9:16 (Portrait)', ratio: { width: 9, height: 16 } },

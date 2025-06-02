@@ -10,6 +10,7 @@ This document outlines planned features, improvements, and to-do items for the A
 - [ ] **Sample Images & User Uploads:** Incorporate sample images for framing reference, similar to the Arri Frameline Composer. Additionally, provide an option for users to upload their own custom images.
 - [ ] **Re-enable Right-Hand Panels:** Uncomment and restore the "Validation Status", "FDL Summary", and "Quick Actions" panels in the UI when appropriate.
 - [ ] **Re-enable Setup Label & Context Creator:** Uncomment and restore the "Setup Label" and "Context Creator" input fields in the Camera Setup section when appropriate.
+- [X] **Re-enable FDL Visualizer:** Uncomment and restore the "Select Camera Setup to Visualize" dropdown and the `FDLVisualizer` component when appropriate. _(Completed - Basic refactor for layout and tech info panel done)_
 
 ## Advanced Features & Collaboration
 

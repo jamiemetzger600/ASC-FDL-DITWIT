@@ -3,6 +3,7 @@ import type { FDL, FramingIntent, Context, Canvas } from '../types/fdl';
 import { generateFDLId } from '../validation/fdlValidator';
 import { COMMON_ASPECT_RATIOS } from '../types/fdl';
 import FDLVisualizer from './FDLVisualizer';
+import FrameLeaderEditor from './FrameLeaderEditor';
 
 interface FDLEditorProps {
   fdl: FDL;
@@ -322,6 +323,9 @@ const CAMERA_DATA: CameraManufacturer[] = [
   },
 ];
 
+const intentColors = ["#f87171", "#60a5fa", "#fbbf24", "#34d399", "#a78bfa", "#fb7185"]; // Red, Blue, Yellow, Green, Purple, Pink
+const intentBackgroundOpacity = '40'; // Approx 25% opacity (hex 40)
+
 const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
   const [advancedSettingsVisible, setAdvancedSettingsVisible] = useState<boolean[]>([]);
   const [visualizedContextIndex, setVisualizedContextIndex] = useState<number | null>(null);
@@ -341,10 +345,20 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
   };
 
   const addFramingIntent = () => {
+    const defaultAspectRatio = { width: 16, height: 9 };
+    const defaultRatioObject = COMMON_ASPECT_RATIOS.find(
+      r => r.ratio.width === defaultAspectRatio.width && r.ratio.height === defaultAspectRatio.height
+    );
+    
+    let initialLabel = '';
+    if (defaultRatioObject && defaultRatioObject.label) {
+      initialLabel = defaultRatioObject.label;
+    }
+
     const newIntent: FramingIntent = {
       id: generateFDLId(`intent_${Date.now()}`),
-      label: '',
-      aspect_ratio: { width: 16, height: 9 }
+      label: initialLabel,
+      aspect_ratio: defaultAspectRatio
     };
     const newIntents = [...(fdl.framing_intents || []), newIntent];
     updateFDL({ framing_intents: newIntents });
@@ -796,136 +810,153 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
 
       {/* Framing Intents */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Framing Intents (Drag to reorder, Top = Highest Priority)</h2>
-          <button
-            onClick={addFramingIntent}
-            className="fdl-button-primary text-sm"
-          >
-            Add Intent
-          </button>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-700">Framing Intents (Drag to reorder, Top = Highest Priority)</h2>
+          <button onClick={addFramingIntent} className="fdl-button-primary text-sm">Add Intent</button>
         </div>
         <div className="space-y-4">
-          {(fdl.framing_intents || []).map((intent, index) => (
-            <div key={intent.id} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <h3 className="font-medium text-gray-900">Intent {index + 1}</h3>
-                  <button 
-                    onClick={() => moveFramingIntent(index, 'up')}
-                    disabled={index === 0}
-                    className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Move Up (Higher Priority)"
+          {(fdl.framing_intents || []).map((intent, index) => {
+            const intentColor = intentColors[index % intentColors.length];
+            const backgroundColor = `${intentColor}${intentBackgroundOpacity}`;
+            
+            return (
+              <div 
+                key={intent.id || index} 
+                className="mb-6 p-5 border border-gray-200 rounded-lg shadow-sm"
+                style={{ backgroundColor: backgroundColor }}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="font-medium text-gray-900">Intent {index + 1}</h3>
+                    <button 
+                      onClick={() => moveFramingIntent(index, 'up')}
+                      disabled={index === 0}
+                      className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Move Up (Higher Priority)"
+                    >
+                      &#x25B2;
+                    </button>
+                    <button 
+                      onClick={() => moveFramingIntent(index, 'down')}
+                      disabled={index === (fdl.framing_intents || []).length - 1}
+                      className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Move Down (Lower Priority)"
+                    >
+                      &#x25BC;
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => removeFramingIntent(index)}
+                    className="text-red-600 hover:text-red-800 text-sm"
                   >
-                    &#x25B2; {/* UP ARROW */}
+                    Remove
                   </button>
-                  <button 
-                    onClick={() => moveFramingIntent(index, 'down')}
-                    disabled={index === (fdl.framing_intents || []).length - 1}
-                    className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Move Down (Lower Priority)"
-                  >
-                    &#x25BC; {/* DOWN ARROW */}
-                  </button>
                 </div>
-                <button
-                  onClick={() => removeFramingIntent(index)}
-                  className="text-red-600 hover:text-red-800 text-sm"
-                >
-                  Remove
-                </button>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quick Aspect Ratio
+                    </label>
+                    <select
+                      onChange={(e) => {
+                        const selectedLabelValue = e.target.value;
+                        const ratioObj = COMMON_ASPECT_RATIOS.find(r => r.label === selectedLabelValue);
+                        if (ratioObj) {
+                          updateFramingIntent(index, { aspect_ratio: ratioObj.ratio, label: selectedLabelValue });
+                        } else {
+                          if (selectedLabelValue === '') { 
+                               updateFramingIntent(index, { 
+                                  aspect_ratio: { width: intent.aspect_ratio.width, height: intent.aspect_ratio.height } 
+                              });
+                          } else {
+                               updateFramingIntent(index, { label: intent.label || '' });
+                          }
+                        }
+                      }}
+                      value={COMMON_ASPECT_RATIOS.find(r => r.ratio.width === intent.aspect_ratio.width && r.ratio.height === intent.aspect_ratio.height)?.label || ''}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Custom...</option>
+                      {COMMON_ASPECT_RATIOS.map((ratio) => (
+                        <option key={ratio.label} value={ratio.label}>
+                          {ratio.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Label
+                    </label>
+                    <input
+                      type="text"
+                      value={intent.label || ''}
+                      onChange={(e) => updateFramingIntent(index, { label: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., 16:9 or Safety"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      ID
+                    </label>
+                    <input
+                      type="text"
+                      value={intent.id}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Second Row for Protection, Width, Height */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Protection (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={intent.protection || ''}
+                      onChange={(e) => updateFramingIntent(index, { 
+                        protection: e.target.value ? Number(e.target.value) : undefined
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Optional (0-99)"
+                      min="0"
+                      max="99"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Width (Aspect Ratio Unit)
+                    </label>
+                    <input
+                      type="number"
+                      value={intent.aspect_ratio.width}
+                      onChange={(e) => updateFramingIntent(index, { 
+                        aspect_ratio: { ...intent.aspect_ratio, width: Number(e.target.value) }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Height (Aspect Ratio Unit)
+                    </label>
+                    <input
+                      type="number"
+                      value={intent.aspect_ratio.height}
+                      onChange={(e) => updateFramingIntent(index, { 
+                        aspect_ratio: { ...intent.aspect_ratio, height: Number(e.target.value) }
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ID
-                  </label>
-                  <input
-                    type="text"
-                    value={intent.id}
-                    onChange={(e) => updateFramingIntent(index, { id: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Label
-                  </label>
-                  <input
-                    type="text"
-                    value={intent.label || ''}
-                    onChange={(e) => updateFramingIntent(index, { label: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Optional label"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Quick Aspect Ratio
-                  </label>
-                  <select
-                    onChange={(e) => {
-                      const ratio = COMMON_ASPECT_RATIOS.find(r => r.label === e.target.value)?.ratio;
-                      if (ratio) {
-                        updateFramingIntent(index, { aspect_ratio: ratio });
-                      }
-                    }}
-                    value={COMMON_ASPECT_RATIOS.find(r => r.ratio.width === intent.aspect_ratio.width && r.ratio.height === intent.aspect_ratio.height)?.label || ''}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Custom...</option>
-                    {COMMON_ASPECT_RATIOS.map((ratio) => (
-                      <option key={ratio.label} value={ratio.label}>
-                        {ratio.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Width
-                  </label>
-                  <input
-                    type="number"
-                    value={intent.aspect_ratio.width}
-                    onChange={(e) => updateFramingIntent(index, { 
-                      aspect_ratio: { ...intent.aspect_ratio, width: Number(e.target.value) }
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Height
-                  </label>
-                  <input
-                    type="number"
-                    value={intent.aspect_ratio.height}
-                    onChange={(e) => updateFramingIntent(index, { 
-                      aspect_ratio: { ...intent.aspect_ratio, height: Number(e.target.value) }
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Protection (%)
-                  </label>
-                  <input
-                    type="number"
-                    value={intent.protection || ''}
-                    onChange={(e) => updateFramingIntent(index, { 
-                      protection: e.target.value ? Number(e.target.value) : undefined
-                    })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Optional"
-                    min="0"
-                    max="100"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {(!fdl.framing_intents || fdl.framing_intents.length === 0) && (
             <div className="text-center py-8 text-gray-500">
               No framing intents defined. Click "Add Intent" to get started.
@@ -958,6 +989,11 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
 
       {/* FDL Visualizer */}
       <FDLVisualizer fdl={fdl} visualizedContextIndex={visualizedContextIndex} />
+
+      {/* Frame Leader Editor - New Section */}
+      {(fdl.contexts && fdl.contexts.length > 0 && visualizedContextIndex !== null) && (
+        <FrameLeaderEditor fdl={fdl} visualizedContextIndex={visualizedContextIndex} />
+      )}
 
       {/* General Information */}
       <div className="bg-white rounded-lg shadow p-6">

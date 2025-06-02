@@ -1,5 +1,5 @@
-import React from 'react';
-import type { FDL, Canvas, FramingIntent, FDLDimensions, FDLPoint } from '../types/fdl';
+import React, { useState } from 'react';
+import type { FDL, Canvas } from '../types/fdl';
 
 interface FDLVisualizerProps {
   fdl: FDL;
@@ -7,40 +7,111 @@ interface FDLVisualizerProps {
 }
 
 const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex }) => {
-  const containerStyle: React.CSSProperties = {
+  const [showTechInfo, setShowTechInfo] = useState(false);
+
+  const mainContainerStyle: React.CSSProperties = {
     border: '1px solid #e2e8f0',
-    borderRadius: '0.375rem',
-    padding: '1rem',
-    minHeight: '350px',
-    backgroundColor: '#f8fafc',
+    borderRadius: '0.5rem',
+    padding: '1.5rem',
+    backgroundColor: '#ffffff',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '1.5rem',
+    marginTop: '1.5rem',
+  };
+
+  const visualizerAreaStyle: React.CSSProperties = {
+    flexGrow: 1,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginTop: '1.5rem',
   };
 
   const svgContainerStyle: React.CSSProperties = {
     width: '100%',
-    maxWidth: '600px',
     aspectRatio: '16 / 9',
-    backgroundColor: '#ffffff',
-    border: '1px solid #cbd5e1',
+    backgroundColor: '#f0f0f0',
+    border: '1px solid #cccccc',
     borderRadius: '0.25rem',
     overflow: 'hidden',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+  };
+
+  const imageSelectionBarStyle: React.CSSProperties = {
+    width: '100%',
+    height: '60px',
+    backgroundColor: '#e2e8f0',
+    border: '1px solid #cbd5e1',
+    borderRadius: '0.25rem',
+    marginTop: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#64748b',
+    fontSize: '0.875rem',
+  };
+
+  const techInfoPanelStyle: React.CSSProperties = {
+    width: '300px',
+    flexShrink: 0,
+    backgroundColor: '#1a1a1a',
+    color: '#e0e0e0',
+    padding: '1rem',
+    borderRadius: '0.375rem',
+    fontSize: '0.8rem',
+    overflowY: 'auto',
+    maxHeight: '500px',
+  };
+
+  const techInfoHeaderStyle: React.CSSProperties = {
+    fontSize: '0.9rem',
+    fontWeight: 'bold',
+    marginBottom: '0.75rem',
+    paddingBottom: '0.5rem',
+    borderBottom: '1px solid #444444',
+  };
+
+  const techInfoSectionStyle: React.CSSProperties = {
+    marginBottom: '1rem',
+  };
+
+  const techInfoLabelStyle: React.CSSProperties = {
+    fontWeight: '600',
+    color: '#a0a0a0',
+    display: 'block',
+    marginBottom: '0.125rem',
+  };
+
+  const techInfoValueStyle: React.CSSProperties = {
+    color: '#d0d0d0',
+    marginBottom: '0.25rem',
   };
 
   const legendItemStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '0.25rem',
+    marginBottom: '0.35rem',
+    fontSize: '0.75rem',
   };
 
   const legendColorSwatchStyle: React.CSSProperties = {
-    width: '12px',
-    height: '12px',
-    marginRight: '8px',
-    border: '1px solid #777',
+    width: '10px',
+    height: '10px',
+    marginRight: '6px',
+    border: '1px solid #777777',
+    flexShrink: 0,
+  };
+
+  const toggleButtonStyle: React.CSSProperties = {
+    padding: '0.5rem 0.75rem',
+    backgroundColor: '#4a5568',
+    color: 'white',
+    border: 'none',
+    borderRadius: '0.25rem',
+    cursor: 'pointer',
+    fontSize: '0.875rem',
+    marginBottom: '1rem',
+    alignSelf: 'flex-start',
   };
 
   const activeContext = 
@@ -53,20 +124,25 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
       : null;
 
   let canvasDisplay;
-  const svgViewportWidth = 500;
-  const svgViewportHeight = 300;
-  const intentColors = ["#fbbf24", "#f87171", "#60a5fa", "#34d399", "#a78bfa", "#fb7185"];
+  const svgViewportWidth = 600;
+  const svgViewportHeight = (svgViewportWidth * 9) / 16;
+  const intentColors = ["#f87171", "#60a5fa", "#fbbf24", "#34d399", "#a78bfa", "#fb7185"];
 
   if (primaryCanvas && primaryCanvas.dimensions && visualizedContextIndex !== null) {
     const { width: canvasWidthPx, height: canvasHeightPx } = primaryCanvas.dimensions;
 
     if (canvasWidthPx > 0 && canvasHeightPx > 0) {
-      const scaleX = svgViewportWidth / canvasWidthPx;
-      const scaleY = svgViewportHeight / canvasHeightPx;
-      const overallScale = Math.min(scaleX, scaleY) * 0.9;
+      const canvasAspectRatio = canvasWidthPx / canvasHeightPx;
+      
+      let scaledCanvasWidth = svgViewportWidth * 0.95;
+      let scaledCanvasHeight = scaledCanvasWidth / canvasAspectRatio;
 
-      const scaledCanvasWidth = canvasWidthPx * overallScale;
-      const scaledCanvasHeight = canvasHeightPx * overallScale;
+      if (scaledCanvasHeight > svgViewportHeight * 0.95) {
+        scaledCanvasHeight = svgViewportHeight * 0.95;
+        scaledCanvasWidth = scaledCanvasHeight * canvasAspectRatio;
+      }
+      
+      const overallScale = scaledCanvasWidth / canvasWidthPx;
 
       const canvasRectX = (svgViewportWidth - scaledCanvasWidth) / 2;
       const canvasRectY = (svgViewportHeight - scaledCanvasHeight) / 2;
@@ -84,8 +160,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
             y={canvasRectY}
             width={scaledCanvasWidth}
             height={scaledCanvasHeight}
-            fill="#e2e8f0"
-            stroke="#94a3b8"
+            fill="#d1d5db"
+            stroke="#6b7280"
             strokeWidth="0.5"
           />
 
@@ -142,17 +218,17 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
                   y={intentRectY}
                   width={scaledIntentWidth}
                   height={scaledIntentHeight}
-                  fill={`${strokeColor}30`}
+                  fill="none"
                   stroke={strokeColor}
-                  strokeWidth="1.5"
-                  strokeDasharray="4 2"
+                  strokeWidth="2"
                 />
                 <text
-                  x={intentRectX + 5} 
-                  y={intentRectY + 12} 
-                  fontSize="8" 
+                  x={intentRectX + scaledIntentWidth - 5}
+                  y={intentRectY + 12}
+                  fontSize="8"
                   fill={strokeColor}
-                  style={{ pointerEvents: 'none' }}
+                  textAnchor="end"
+                  style={{ pointerEvents: 'none', fontWeight: 'bold' }}
                 >
                   {intent.label || intent.id}{intent.protection ? ` (${intent.protection}% prot.)` : ''}
                 </text>
@@ -170,43 +246,110 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     canvasDisplay = <p className="text-sm text-gray-500">No Camera Setup selected or available to display intents.</p>;
   }
 
-  return (
-    <div style={containerStyle}>
-      <h3 className="text-lg font-medium text-gray-800 mb-3 self-start">Frameline Visualizer</h3>
-      {canvasDisplay}
-      
-      {primaryCanvas && visualizedContextIndex !== null && (
-        <div className="mt-3 text-xs text-left bg-white p-3 border rounded w-full max-w-md shadow-sm">
-          <p><strong>Displaying on:</strong> {primaryCanvas.label || 'N/A'} 
-            (Context {visualizedContextIndex + 1}{activeContext?.label && activeContext.label !== `Camera Setup ${visualizedContextIndex + 1}` ? `: ${activeContext.label}` : ''} - Canvas 1)
-          </p>
-          <p><strong>Canvas Dimensions:</strong> {primaryCanvas.dimensions?.width || 'N/A'}x{primaryCanvas.dimensions?.height || 'N/A'} px</p>
-          
-          <h4 className="font-semibold mt-2 mb-1">Legend:</h4>
-          <div style={legendItemStyle}>
-            <span style={{ ...legendColorSwatchStyle, backgroundColor: '#e2e8f0' }} />
-            <span>Primary Canvas</span>
-          </div>
-          {(fdl.framing_intents || []).filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0).map((intent, index) => {
-            const strokeColor = intentColors[index % intentColors.length];
-            return (
-              <div key={`legend-${intent.id || index}`} style={legendItemStyle}>
-                <span style={{ ...legendColorSwatchStyle, backgroundColor: `${strokeColor}30`, borderColor: strokeColor }} />
-                <span>{intent.label || intent.id || `Intent ${index + 1}`}{intent.protection ? ` (${intent.protection}% prot.)` : ''}</span>
-              </div>
-            );
-          })}
-          {(!fdl.framing_intents || fdl.framing_intents.filter(i => i.aspect_ratio && i.aspect_ratio.width > 0 && i.aspect_ratio.height > 0).length === 0) && (
-             <p className="italic text-gray-500">No valid framing intents to display.</p>
-          )}
+  const renderTechInfoPanel = () => {
+    if (!primaryCanvas || visualizedContextIndex === null) {
+      return <div style={{ ...techInfoPanelStyle, justifyContent: 'center', alignItems: 'center', display: 'flex' }}><p>No data to display.</p></div>;
+    }
+
+    const sensorActiveImageArea = {
+      photosites: `${primaryCanvas.photosite_dimensions?.width || 'N/A'} x ${primaryCanvas.photosite_dimensions?.height || 'N/A'} photosites`,
+      mm: `${primaryCanvas.physical_dimensions?.width?.toFixed(2) || 'N/A'} x ${primaryCanvas.physical_dimensions?.height?.toFixed(2) || 'N/A'} mm`,
+      photositeCount: primaryCanvas.photosite_dimensions?.width && primaryCanvas.photosite_dimensions?.height ? (primaryCanvas.photosite_dimensions.width * primaryCanvas.photosite_dimensions.height).toLocaleString() : 'N/A',
+    };
+    
+    const imageCircle = {
+        mm: primaryCanvas.physical_dimensions?.width && primaryCanvas.physical_dimensions?.height ? 
+            Math.sqrt(Math.pow(primaryCanvas.physical_dimensions.width, 2) + Math.pow(primaryCanvas.physical_dimensions.height, 2)).toFixed(2) + ' mm' 
+            : 'N/A',
+    };
+
+    const recordingFileImageContent = `${primaryCanvas.dimensions?.width || 'N/A'} x ${primaryCanvas.dimensions?.height || 'N/A'} px`;
+
+    return (
+      <div style={techInfoPanelStyle}>
+        <h4 style={techInfoHeaderStyle}>Technical Information</h4>
+        
+        <div style={techInfoSectionStyle}>
+            <span style={techInfoLabelStyle}>Displaying On:</span>
+            <p style={techInfoValueStyle}>
+                {primaryCanvas.label || 'Primary Canvas'} (Context {visualizedContextIndex + 1}
+                {activeContext?.label && activeContext.label !== `Camera Setup ${visualizedContextIndex + 1}` ? `: ${activeContext.label}` : ''})
+            </p>
+            {activeContext?.meta?.manufacturer && (
+                 <p style={techInfoValueStyle}>{activeContext.meta.manufacturer} {activeContext.meta.model}</p>
+            )}
         </div>
-      )}
-      {(visualizedContextIndex === null && fdl.contexts && fdl.contexts.length > 0) &&
-         <p className="mt-2 text-sm text-gray-500">Select a Camera Setup from the dropdown to visualize its primary canvas.</p>
-      }
-      {(!fdl.contexts || fdl.contexts.length === 0) && (
-         <p className="mt-2 text-sm text-gray-500">Define a Camera Setup to begin visualization.</p>
-      )}
+
+        <div style={techInfoSectionStyle}>
+          <span style={techInfoLabelStyle}>Sensor Active Image Area:</span>
+          <p style={techInfoValueStyle}>{sensorActiveImageArea.photosites}</p>
+          <p style={techInfoValueStyle}>{sensorActiveImageArea.mm}</p>
+          <span style={techInfoLabelStyle}>Photosite Count:</span>
+          <p style={techInfoValueStyle}>{sensorActiveImageArea.photositeCount}</p>
+          <span style={techInfoLabelStyle}>Image Circle:</span>
+          <p style={techInfoValueStyle}>{imageCircle.mm}</p>
+        </div>
+
+        <div style={techInfoSectionStyle}>
+          <span style={techInfoLabelStyle}>Recording File Image Content:</span>
+          <p style={techInfoValueStyle}>{recordingFileImageContent}</p>
+        </div>
+        
+        {(fdl.framing_intents || []).filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0).map((intent, index) => {
+          const strokeColor = intentColors[index % intentColors.length];
+          const intentAr = intent.aspect_ratio.width / intent.aspect_ratio.height;
+          
+          let frameLineWidthPx = primaryCanvas.dimensions?.width || 0;
+          let frameLineHeightPx = frameLineWidthPx / intentAr;
+          if (frameLineHeightPx > (primaryCanvas.dimensions?.height || 0)) {
+            frameLineHeightPx = primaryCanvas.dimensions?.height || 0;
+            frameLineWidthPx = frameLineHeightPx * intentAr;
+          }
+          
+          let displayWidth = frameLineWidthPx;
+          let displayHeight = frameLineHeightPx;
+          if(intent.protection && intent.protection > 0 && intent.protection < 100){
+            const protectionFactor = 1 - (intent.protection / 100);
+            displayWidth *= protectionFactor;
+            displayHeight *= protectionFactor;
+          }
+
+          return (
+            <div key={`tech-intent-${intent.id || index}`} style={{...techInfoSectionStyle, borderTop: '1px solid #333333', paddingTop: '0.75rem' }}>
+              <div style={{display: 'flex', alignItems: 'center', marginBottom: '0.3rem'}}>
+                <span style={{ ...legendColorSwatchStyle, backgroundColor: `${strokeColor}B3`, borderColor: strokeColor }} />
+                <span style={{...techInfoLabelStyle, color: strokeColor, marginBottom: 0 }}>Frame Line: {intent.label || intent.id || `Intent ${index + 1}`}</span>
+              </div>
+              <p style={techInfoValueStyle}>Size: {Math.round(displayWidth)} x {Math.round(displayHeight)} px</p>
+              <p style={techInfoValueStyle}>Aspect Ratio: {intent.aspect_ratio.width}:{intent.aspect_ratio.height} ({intentAr.toFixed(2)}:1)</p>
+              {intent.protection && <p style={techInfoValueStyle}>Protection: {intent.protection}%</p>}
+            </div>
+          );
+        })}
+        {(!fdl.framing_intents || fdl.framing_intents.filter(i => i.aspect_ratio && i.aspect_ratio.width > 0 && i.aspect_ratio.height > 0).length === 0) && (
+           <p style={{...techInfoValueStyle, fontStyle: 'italic' }}>No valid framing intents.</p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={mainContainerStyle} className="fdl-visualizer-main-container">
+      <div style={visualizerAreaStyle} className="fdl-visualizer-area">
+        <h3 className="text-lg font-medium text-gray-900 mb-4 self-start">Frame Line Preview</h3>
+        <button 
+          onClick={() => setShowTechInfo(!showTechInfo)} 
+          style={toggleButtonStyle}
+          className="fdl-button-secondary text-sm mb-3"
+        >
+          {showTechInfo ? 'Hide' : 'Show'} Technical Info
+        </button>
+        {canvasDisplay}
+        <div style={imageSelectionBarStyle}>
+          Image Selection Bar (Placeholder)
+        </div>
+      </div>
+      {showTechInfo && renderTechInfoPanel()}
     </div>
   );
 };
