@@ -428,12 +428,6 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
     }
   };
 
-  const updateContext = (contextIndex: number, updates: Partial<Context>) => {
-    const newContexts = [...(fdl.contexts || [])];
-    newContexts[contextIndex] = { ...newContexts[contextIndex], ...updates };
-    updateFDL({ contexts: newContexts });
-  };
-
   const updateCanvas = (contextIndex: number, canvasIndex: number, updates: Partial<Canvas>) => {
     const newContexts = [...(fdl.contexts || [])];
     if (newContexts[contextIndex] && newContexts[contextIndex].canvases) {

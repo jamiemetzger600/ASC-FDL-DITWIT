@@ -6,7 +6,6 @@ import './App.css';
 // Component imports (we'll create these next)
 import Header from './components/Header';
 import FDLEditor from './components/FDLEditor';
-import ValidationPanel from './components/ValidationPanel.tsx';
 
 function App() {
   const [fdl, setFdl] = useState<FDL>(createEmptyFDL());

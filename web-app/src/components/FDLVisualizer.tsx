@@ -87,12 +87,14 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     marginBottom: '0.25rem',
   };
 
+  /* // Removing unused legendItemStyle
   const legendItemStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     marginBottom: '0.35rem',
     fontSize: '0.75rem',
   };
+  */
 
   const legendColorSwatchStyle: React.CSSProperties = {
     width: '10px',
