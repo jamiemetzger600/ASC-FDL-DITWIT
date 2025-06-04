@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { FDL, FramingIntent, Canvas } from '../types/fdl';
+import type { FDL, FramingIntent, Canvas, FramingDecision, FDLPoint, FDLDimensions } from '../types/fdl';
 import { jsPDF, type jsPDFOptions } from 'jspdf';
 import 'svg2pdf.js'; // Extends jsPDF. Must be imported after jsPDF
+import { generateFDLId } from '../validation/fdlValidator';
+import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry'; // Import the function
 
 export interface TextElementSettings {
   text: string;
@@ -58,9 +60,24 @@ interface UserFont {
 interface FrameLeaderEditorProps {
   fdl: FDL;
   visualizedContextIndex: number | null;
+  onChange: (fdl: FDL) => void;
 }
 
-const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedContextIndex }) => {
+// Helper function to calculate geometry for a FramingDecision
+// function calculateFramingDecisionGeometry( ... MOVED TO fdlGeometry.ts ... )
+
+// Helper function to sanitize filename
+const sanitizeFilename = (name: string): string => {
+  if (!name) return '';
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/[^a-z0-9\-_.]/g, '') // Remove non-alphanumeric characters except hyphens, underscores, periods
+    .replace(/-+/g, '-'); // Replace multiple hyphens with a single one
+};
+
+const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedContextIndex, onChange }) => {
   const svgPreviewViewBoxWidth = 800;
   const svgPreviewViewBoxHeight = 450;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -76,8 +93,12 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
 
   const createInitialIntentVisibility = () => {
     const visibility: { [intentId: string]: boolean } = {};
-    (fdl.framing_intents || []).forEach((intent, idx) => {
-      visibility[intent.id] = idx < 2; 
+    // Initialize based on existing framing_decisions for the current canvas
+    const currentDecisionIntentIds = new Set(
+      primaryCanvas?.framing_decisions?.map(fd => fd.framing_intent_id) || []
+    );
+    (fdl.framing_intents || []).forEach((intent) => {
+      visibility[intent.id] = currentDecisionIntentIds.has(intent.id);
     });
     return visibility;
   };
@@ -103,7 +124,12 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   const [settings, setSettings] = useState<FrameLeaderSettings>(getDefaultFrameLeaderSettings());
   const [isFrameLeaderSettingsVisible, setIsFrameLeaderSettingsVisible] = useState(false);
   const [userFonts, setUserFonts] = useState<UserFont[]>([]);
-  const [exportFilename, setExportFilename] = useState<string>('frame-leader');
+  
+  // Initialize exportFilename based on the default title text
+  const [exportFilename, setExportFilename] = useState<string>(
+    () => sanitizeFilename(getDefaultFrameLeaderSettings().title.text) || 'frame-leader'
+  );
+  const [isFilenameManuallyEdited, setIsFilenameManuallyEdited] = useState<boolean>(false);
 
   useEffect(() => {
     setSettings(prevSettings => ({
@@ -111,7 +137,59 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       intentVisibility: createInitialIntentVisibility()
     }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fdl.framing_intents]);
+  }, [fdl.framing_intents, primaryCanvas]); // Depend on primaryCanvas to re-init visibility
+
+  // Effect to update exportFilename when settings.title.text changes, if not manually edited
+  useEffect(() => {
+    if (!isFilenameManuallyEdited) {
+      setExportFilename(sanitizeFilename(settings.title.text) || 'frame-leader');
+    }
+  }, [settings.title.text, isFilenameManuallyEdited]);
+
+  const handleIntentVisibilityChange = (intentId: string, isVisible: boolean) => {
+    if (!primaryCanvas || visualizedContextIndex === null) return;
+
+    const newFdl = JSON.parse(JSON.stringify(fdl)) as FDL; // Deep clone
+    const targetCanvas = newFdl.contexts?.[visualizedContextIndex]?.canvases?.[0];
+
+    if (!targetCanvas) return;
+
+    let currentFramingDecisions = targetCanvas.framing_decisions || [];
+
+    if (isVisible) {
+      // Add FramingDecision if not already present
+      if (!currentFramingDecisions.some(fd => fd.framing_intent_id === intentId)) {
+        const intent = fdl.framing_intents?.find(fi => fi.id === intentId);
+        if (intent) {
+          const geometry = calculateFramingDecisionGeometry(intent, primaryCanvas);
+          if (geometry) {
+            const newDecision: FramingDecision = {
+              id: generateFDLId(intent.label || `decision_${intentId}`),
+              label: intent.label || 'Framing Decision',
+              framing_intent_id: intentId,
+              ...geometry,
+            };
+            currentFramingDecisions.push(newDecision);
+          }
+        }
+      }
+    } else {
+      // Remove FramingDecision
+      currentFramingDecisions = currentFramingDecisions.filter(fd => fd.framing_intent_id !== intentId);
+    }
+
+    targetCanvas.framing_decisions = currentFramingDecisions;
+    onChange(newFdl); // Propagate change to FDLEditor
+
+    // Update local settings state for UI checkbox
+    setSettings(prev => ({
+      ...prev,
+      intentVisibility: {
+        ...prev.intentVisibility,
+        [intentId]: isVisible,
+      },
+    }));
+  };
 
   const handleTextElementChange = (
     elementKey: 'title' | 'director' | 'dp' | 'text1' | 'text2',
@@ -135,8 +213,10 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   };
   
   const resetToDefaults = () => {
-    setSettings(getDefaultFrameLeaderSettings());
-    setExportFilename('frame-leader');
+    const defaultSettings = getDefaultFrameLeaderSettings();
+    setSettings(defaultSettings);
+    setExportFilename(sanitizeFilename(defaultSettings.title.text) || 'frame-leader');
+    setIsFilenameManuallyEdited(false); // Reset manual edit flag
     // Optionally clear user fonts on reset, or keep them?
     // setUserFonts([]); 
   };
@@ -660,9 +740,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                         type="checkbox"
                         id={`intent-vis-${intent.id}`}
                         checked={settings.intentVisibility[intent.id] || false}
-                        onChange={e => {
-                          const newVisibility = { ...settings.intentVisibility, [intent.id]: e.target.checked };
-                          handleGenericSettingChange('intentVisibility', newVisibility);
+                        onChange={(e) => {
+                          handleIntentVisibilityChange(intent.id, e.target.checked);
                         }}
                         className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
@@ -846,7 +925,10 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                     type="text" 
                     id="export-filename"
                     value={exportFilename}
-                    onChange={(e) => setExportFilename(e.target.value)}
+                    onChange={(e) => {
+                      setExportFilename(e.target.value);
+                      setIsFilenameManuallyEdited(true); // Mark as manually edited
+                    }}
                     className="w-full fdl-input"
                     placeholder="frame-leader"
                   />

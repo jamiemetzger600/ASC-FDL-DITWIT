@@ -13,7 +13,7 @@ export interface FDLPoint {
 
 export interface FDLVersion {
   major: 1;
-  minor: 0;
+  minor: 1;
 }
 
 export interface FramingIntent {
@@ -107,17 +107,6 @@ export interface FDL {
   framing_intents?: FramingIntent[];
   contexts?: Context[];
   canvas_templates?: CanvasTemplate[];
-}
-
-// Form state interfaces for UI
-export interface FDLFormState {
-  fdl: FDL;
-  isValid: boolean;
-  validationErrors: string[];
-}
-
-export interface FormErrors {
-  [key: string]: string | FormErrors;
 }
 
 // Common aspect ratios for quick selection
