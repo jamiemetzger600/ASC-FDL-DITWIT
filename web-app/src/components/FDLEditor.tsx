@@ -385,8 +385,6 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
 
   const [selectedCameraSelections, setSelectedCameraSelections] = useState<CameraSelection[]>(() => initializeCameraSelections(fdl));
   const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean[]>([]);
-  const [activeFramingIntentTab, setActiveFramingIntentTab] = useState(0);
-
 
   useEffect(() => {
     // Synchronize selectedCameraSelections when FDL prop changes (e.g., on import)

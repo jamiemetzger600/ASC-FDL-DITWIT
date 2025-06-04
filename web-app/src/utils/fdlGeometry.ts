@@ -1,4 +1,4 @@
-import type { FramingIntent, Canvas, FramingDecision, FDLPoint, FDLDimensions } from '../types/fdl';
+import type { FramingIntent, Canvas, FramingDecision } from '../types/fdl';
 
 export function calculateFramingDecisionGeometry(
   intent: FramingIntent,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { FDL, FramingIntent, Canvas, FramingDecision, FDLPoint, FDLDimensions } from '../types/fdl';
+import type { FDL, FramingIntent, Canvas, FramingDecision } from '../types/fdl';
 import { jsPDF, type jsPDFOptions } from 'jspdf';
 import 'svg2pdf.js'; // Extends jsPDF. Must be imported after jsPDF
 import { generateFDLId } from '../validation/fdlValidator';
