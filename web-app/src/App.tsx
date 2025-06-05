@@ -59,14 +59,6 @@ function App() {
               onChange={handleFDLChange}
             />
           </div>
-          
-          {/* Validation Panel - Temporarily Hidden */}
-          {/* <div className="lg:col-span-1">
-            <ValidationPanel 
-              validationResult={validationResult}
-              fdl={fdl}
-            />
-          </div> */}
         </div>
       </main>
     </div>
