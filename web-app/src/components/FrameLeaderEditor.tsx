@@ -4,39 +4,7 @@ import { jsPDF, type jsPDFOptions } from 'jspdf';
 import 'svg2pdf.js'; // Extends jsPDF. Must be imported after jsPDF
 import { generateFDLId } from '../validation/fdlValidator';
 import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry'; // Import the function
-
-export interface TextElementSettings {
-  text: string;
-  fontSize: number;
-  position: { x: number; y: number };
-  fontFamily: string;
-  bold: boolean;
-  italic: boolean;
-  underline: boolean;
-  // Future: color, fontFamily, etc.
-}
-
-export interface FrameLeaderSettings {
-  title: TextElementSettings;
-  director: TextElementSettings;
-  dp: TextElementSettings;
-  text1: TextElementSettings;
-  text2: TextElementSettings;
-
-  // showFrameLinesA: boolean; // To be replaced by dynamic intent visibility
-  // showFrameLinesB: boolean;
-  intentVisibility: { [intentId: string]: boolean };
-
-  centerMarkerEnabled: boolean;
-  centerMarkerSize: number;
-  siemensStarsEnabled: boolean;
-  siemensStarsSize: number;
-  anamorphicDesqueezeInPreview: boolean;
-  customLogoEnabled?: boolean;
-  customLogoUrl?: string | null;
-  customLogoSize?: number;
-  customLogoPosition?: { x: number; y: number };
-}
+import { useFrameLeaderSettingsStore, type FrameLeaderSettings, type TextElementSettings, type CustomFont, type CustomImage } from '../stores/frameLeaderSettingsStore';
 
 const intentColors = ["#f87171", "#60a5fa", "#fbbf24", "#34d399", "#a78bfa", "#fb7185"];
 
@@ -51,11 +19,7 @@ const PREDEFINED_FONTS = [
   { name: 'Lucida Console', family: '\'Lucida Console\', Monaco, monospace' }
 ];
 
-interface UserFont {
-    name: string; // e.g., filename or user-given name
-    family: string; // The name used in CSS font-family
-    // url?: string; // dataURL, might not be needed if FontFace handles it directly
-}
+
 
 interface FrameLeaderEditorProps {
   fdl: FDL;
@@ -77,10 +41,15 @@ const sanitizeFilename = (name: string): string => {
     .replace(/-+/g, '-'); // Replace multiple hyphens with a single one
 };
 
+const FRAME_LEADER_SETTINGS_STORAGE_KEY = 'fdl-frameleader-settings';
+
 const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedContextIndex, onChange }) => {
   const svgPreviewViewBoxWidth = 800;
   const svgPreviewViewBoxHeight = 450;
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Zustand store integration
+  const { settings, setSettings, updateSettings, resetSettings, addCustomFont, addCustomImage } = useFrameLeaderSettingsStore();
 
   const activeContext = 
     visualizedContextIndex !== null && fdl.contexts && fdl.contexts[visualizedContextIndex]
@@ -118,12 +87,47 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     customLogoEnabled: false,
     customLogoUrl: null,
     customLogoSize: 15, 
-    customLogoPosition: { x: 50, y: 50 }, 
+    customLogoPosition: { x: 50, y: 50 },
+    customFonts: [],
+    customImages: [], 
   });
   
-  const [settings, setSettings] = useState<FrameLeaderSettings>(getDefaultFrameLeaderSettings());
+  // Initialize store on first render or when hydrated state is null
+  useEffect(() => {
+    if (settings === null) {
+      const defaultSettings = getDefaultFrameLeaderSettings();
+      const savedSettings = useFrameLeaderSettingsStore.getState().settings; // Get hydrated state
+      setSettings(savedSettings || defaultSettings);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings]);
+
+  // Restore custom fonts to document.fonts when component loads
+  useEffect(() => {
+    const loadCustomFonts = async () => {
+      if (settings?.customFonts) {
+        for (const font of settings.customFonts) {
+          try {
+            // Check if font is already loaded to avoid duplicates
+            const existingFont = Array.from(document.fonts).find(f => f.family === font.family);
+            if (!existingFont) {
+              const newFont = new FontFace(font.family, `url(${font.data})`);
+              await newFont.load();
+              document.fonts.add(newFont);
+            }
+          } catch (error) {
+            console.warn(`Failed to restore font ${font.name}:`, error);
+          }
+        }
+      }
+    };
+    
+    if (settings) {
+      loadCustomFonts();
+    }
+  }, [settings?.customFonts]);
+
   const [isFrameLeaderSettingsVisible, setIsFrameLeaderSettingsVisible] = useState(false);
-  const [userFonts, setUserFonts] = useState<UserFont[]>([]);
   
   // Initialize exportFilename based on the default title text
   const [exportFilename, setExportFilename] = useState<string>(
@@ -132,19 +136,18 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   const [isFilenameManuallyEdited, setIsFilenameManuallyEdited] = useState<boolean>(false);
 
   useEffect(() => {
-    setSettings(prevSettings => ({
-      ...prevSettings,
-      intentVisibility: createInitialIntentVisibility()
-    }));
+    if (settings) {
+      updateSettings({ intentVisibility: createInitialIntentVisibility() });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fdl.framing_intents, primaryCanvas]); // Depend on primaryCanvas to re-init visibility
 
   // Effect to update exportFilename when settings.title.text changes, if not manually edited
   useEffect(() => {
-    if (!isFilenameManuallyEdited) {
+    if (!isFilenameManuallyEdited && settings?.title?.text) {
       setExportFilename(sanitizeFilename(settings.title.text) || 'frame-leader');
     }
-  }, [settings.title.text, isFilenameManuallyEdited]);
+  }, [settings?.title?.text, isFilenameManuallyEdited]);
 
   const handleIntentVisibilityChange = (intentId: string, isVisible: boolean) => {
     if (!primaryCanvas || visualizedContextIndex === null) return;
@@ -182,13 +185,12 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     onChange(newFdl); // Propagate change to FDLEditor
 
     // Update local settings state for UI checkbox
-    setSettings(prev => ({
-      ...prev,
+    updateSettings({
       intentVisibility: {
-        ...prev.intentVisibility,
+        ...settings.intentVisibility,
         [intentId]: isVisible,
       },
-    }));
+    });
   };
 
   const handleTextElementChange = (
@@ -196,29 +198,27 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     field: keyof TextElementSettings,
     value: string | number | boolean | TextElementSettings['position']
   ) => {
-    setSettings(prev => ({
-      ...prev,
+    updateSettings({
       [elementKey]: {
-        ...(prev[elementKey] as TextElementSettings),
+        ...(settings[elementKey] as TextElementSettings),
         [field]: value
       }
-    }));
+    });
   };
 
   const handleGenericSettingChange = <K extends keyof Omit<FrameLeaderSettings, 'title'|'director'|'dp'|'text1'|'text2'>>(
     key: K,
     value: FrameLeaderSettings[K]
   ) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+    updateSettings({ [key]: value } as Partial<FrameLeaderSettings>);
   };
   
   const resetToDefaults = () => {
     const defaultSettings = getDefaultFrameLeaderSettings();
-    setSettings(defaultSettings);
+    resetSettings(defaultSettings);
     setExportFilename(sanitizeFilename(defaultSettings.title.text) || 'frame-leader');
     setIsFilenameManuallyEdited(false); // Reset manual edit flag
-    // Optionally clear user fonts on reset, or keep them?
-    // setUserFonts([]); 
+    alert('Settings have been reset to their defaults.');
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,20 +226,18 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSettings(prev => ({
-          ...prev,
+        updateSettings({
           customLogoUrl: reader.result as string,
           customLogoEnabled: true, 
-        }));
+        });
       };
       reader.onerror = (error) => {
         console.error("Error reading file for custom logo:", error);
         alert("Error uploading logo. Please try a different file or check the console.");
-        setSettings(prev => ({
-          ...prev,
+        updateSettings({
           customLogoUrl: null,
           customLogoEnabled: false,
-        }));
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -265,7 +263,16 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       await newFont.load();
       document.fonts.add(newFont);
 
-      setUserFonts(prevFonts => [...prevFonts, { name: fontName, family: fontFamilyName }]);
+      // Add to persistent store
+      const customFont: CustomFont = {
+        id: `font-${Date.now()}`,
+        name: fontName,
+        family: fontFamilyName,
+        data: fontDataUrl,
+        format: file.name.split('.').pop()?.toLowerCase() || 'unknown',
+        originalFilename: file.name
+      };
+      addCustomFont(customFont);
       alert(`Font '${fontName}' uploaded and ready to use.`);
 
     } catch (error) {
@@ -470,7 +477,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     );
   };
 
-  const allAvailableFonts = [...PREDEFINED_FONTS, ...userFonts];
+  const allAvailableFonts = [...PREDEFINED_FONTS, ...(settings?.customFonts || []).map(font => ({ name: font.name, family: font.family }))];
 
   const triggerDownload = (href: string, filename: string) => {
     const link = document.createElement('a');
@@ -619,6 +626,10 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     }
   };
 
+  if (!settings) {
+    return <div>Loading settings...</div>; // Or a spinner
+  }
+
   return (
     <div className="bg-white rounded-lg shadow p-6 mt-8">
       <div 
@@ -639,14 +650,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
         <>
           {/* Section 1: Live Preview and Reset Button (Top) */}
           <div className="mb-6">
-            <div className="flex justify-end mb-2">
-                <button 
-                    onClick={resetToDefaults} 
-                    className="fdl-button-secondary text-sm"
-                >
-                    Reset to Defaults
-                </button>
-            </div>
+
             <div className="border rounded-md p-2 bg-gray-50 max-w-3xl mx-auto aspect-video" style={{ aspectRatio: `${svgPreviewViewBoxWidth}/${svgPreviewViewBoxHeight}` }}>
                 <svg ref={svgRef} viewBox={`0 0 ${svgPreviewViewBoxWidth} ${svgPreviewViewBoxHeight}`} className="w-full h-full">
                 <rect x="0" y="0" width={svgPreviewViewBoxWidth} height={svgPreviewViewBoxHeight} fill="#f0f0f0" />
@@ -906,11 +910,11 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                     className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                   />
                 </div>
-                {userFonts.length > 0 && (
+                {(settings?.customFonts?.length || 0) > 0 && (
                   <div className="mt-2">
-                    <p className="text-xs text-gray-600">Uploaded fonts (session only):</p>
+                    <p className="text-xs text-gray-600">Uploaded fonts (persistent):</p>
                     <ul className="list-disc list-inside pl-2 text-xs text-gray-500">
-                      {userFonts.map(font => <li key={font.family}>{font.name}</li>)}
+                      {settings.customFonts.map(font => <li key={font.id}>{font.name}</li>)}
                     </ul>
                   </div>
                 )}
@@ -937,7 +941,18 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                   <button onClick={handleExportSVG} className="fdl-button-secondary">Export SVG</button>
                   <button onClick={() => handleExportImage('png')} className="fdl-button-secondary">Export PNG (with Alpha)</button>
                   <button onClick={() => handleExportImage('jpeg')} className="fdl-button-secondary">Export JPEG</button>
-                  <button onClick={handleExportPDF} className="fdl-button-secondary">Export PDF</button>
+                  <button
+                    onClick={handleExportPDF}
+                    className="fdl-button-secondary"
+                  >
+                    Export as PDF
+                  </button>
+                  <button
+                    onClick={resetToDefaults}
+                    className="px-4 py-2 text-sm rounded-md bg-gray-200 text-red-700 font-bold hover:bg-gray-300 uppercase"
+                  >
+                    Reset to Defaults
+                  </button>
                 </div>
               </div>
 

@@ -5,6 +5,9 @@ import { COMMON_ASPECT_RATIOS } from '../types/fdl';
 import FDLVisualizer from './FDLVisualizer';
 import FrameLeaderEditor from './FrameLeaderEditor';
 import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry';
+import Header from './Header';
+import { useFrameLeaderSettingsStore } from '../stores/frameLeaderSettingsStore';
+import { useFdlStore } from '../stores/fdlStore';
 
 interface FDLEditorProps {
   fdl: FDL;
@@ -32,7 +35,7 @@ interface CameraManufacturer {
 interface CameraSelection {
   manufacturer: string;
   model: string;
-  resolutionName?: string; // Optional, to store the selected resolution name
+  resolutionName: string; // Required to store the selected resolution name
 }
 
 const CAMERA_DATA: CameraManufacturer[] = [
@@ -338,13 +341,46 @@ const CAMERA_DATA: CameraManufacturer[] = [
 const intentColors = ["#f87171", "#60a5fa", "#fbbf24", "#34d399", "#a78bfa", "#fb7185"]; // Red, Blue, Yellow, Green, Purple, Pink
 const intentBackgroundOpacity = '40'; // Approx 25% opacity (hex 40)
 
-const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
-  const [selectedContextIndex, setSelectedContextIndex] = useState<number | null>(
-    fdl.contexts && fdl.contexts.length > 0 ? 0 : null
-  );
-  const [selectedVisualizedContextIndex, setSelectedVisualizedContextIndex] = useState<number | null>(
-    fdl.contexts && fdl.contexts.length > 0 ? 0 : null
-  );
+const FDLEditor: React.FC = () => {
+  const { fdl, setFdl } = useFdlStore();
+  const [selectedVisualizedContextIndex, setSelectedVisualizedContextIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    // ... existing code ...
+  }, [fdl.contexts]);
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(fdl, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `fdl_${new Date().toISOString().split('T')[0]}.fdl`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const handleImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result as string;
+        const importedFdl = JSON.parse(result) as FDL;
+        
+        setFdl(importedFdl);
+        alert('FDL imported successfully!');
+      } catch (error) {
+        console.error('Error importing FDL file:', error);
+        alert('Error importing FDL file. Please ensure the file is a correctly formatted JSON FDL file.');
+      }
+    };
+    reader.readAsText(file);
+  };
+  
+  const updateFDL = (newFdl: Partial<FDL>) => {
+    setFdl({ ...fdl, ...newFdl });
+  };
 
   // Initialize selectedCameraSelections based on the initial FDL or defaults
   const initializeCameraSelections = (currentFdl: FDL): CameraSelection[] => {
@@ -375,7 +411,6 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
             }
           }
           console.warn(`FDLEditor:initializeCameraSelections - Could not find matching camera data for canvas ID: ${importedCanvasId}. Using defaults for context "${context.label || 'Untitled'}".`);
-          return defaultSelection;
         }
         return defaultSelection; // Default for context with no canvases
       });
@@ -385,6 +420,7 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
 
   const [selectedCameraSelections, setSelectedCameraSelections] = useState<CameraSelection[]>(() => initializeCameraSelections(fdl));
   const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean[]>([]);
+  const [selectedContextIndex, setSelectedContextIndex] = useState<number | null>(null);
 
   useEffect(() => {
     // Synchronize selectedCameraSelections when FDL prop changes (e.g., on import)
@@ -437,10 +473,6 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fdl?.contexts?.length, selectedContextIndex]); // React to changes in number of contexts
-
-  const updateFDL = (updates: Partial<FDL>) => {
-    onChange({ ...fdl, ...updates });
-  };
 
   const addFramingIntent = () => {
     const defaultAspectRatio = { width: 16, height: 9 };
@@ -548,7 +580,7 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
         // For now, updateFramingIntent will only modify *existing* decisions.
       }
     }
-    onChange(clonedFdl); // Use the generic onChange, not updateFDL directly
+    updateFDL(clonedFdl); // Use the generic onChange, not updateFDL directly
   };
 
   const removeFramingIntent = (index: number) => {
@@ -783,505 +815,487 @@ const FDLEditor: React.FC<FDLEditorProps> = ({ fdl, onChange }) => {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Camera & Canvas Setups */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-900">Camera & Canvas Setups</h2>
-          <button
-            onClick={addContext}
-            className="fdl-button-primary text-sm"
-          >
-            Add Camera Setup
-          </button>
-        </div>
-        <div className="space-y-4">
-          {(fdl.contexts || []).map((context, contextIndex) => {
-            // Derive current manufacturer and model from cameraSelections state
-            const currentSelection = selectedCameraSelections[contextIndex] || { manufacturer: '', model: '', resolutionName: '' };
-            const currentManufacturerData = CAMERA_DATA.find(m => m.name === currentSelection.manufacturer);
-            const currentModelData = currentManufacturerData?.models.find(mod => mod.name === currentSelection.model);
-            
-            const primaryCanvas = context.canvases && context.canvases.length > 0 ? context.canvases[0] : null;
-
-            return (
-            <div key={contextIndex} className="border border-gray-200 rounded-lg p-4"> {/* Use contextIndex as key */}
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-gray-900">{context.label || `Camera Setup ${contextIndex + 1}`}</h3>
-                <button
-                  onClick={() => removeContext(contextIndex)}
-                  className="text-red-600 hover:text-red-800 text-sm"
-                >
-                  Remove
-                </button>
-              </div>
-              
-              {/* Canvas Definition - MOVED UP */}
-              <div className="bg-gray-50 p-4 rounded-md mb-4 space-y-3">
-                <h4 className="text-md font-medium text-gray-800 mb-2 border-b pb-2">Canvas Definition</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label htmlFor={`manufacturer-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Manufacturer</label>
-                    <select
-                      id={`manufacturer-${contextIndex}`}
-                      value={currentSelection.manufacturer}
-                      onChange={(e) => handleCameraSelectionChange(contextIndex, 'manufacturer', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Manufacturer</option>
-                      {CAMERA_DATA.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor={`model-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Model</label>
-                    <select
-                      id={`model-${contextIndex}`}
-                      key={`model-select-${currentSelection.manufacturer}-${currentSelection.model}-${contextIndex}`} // Key for re-render
-                      value={currentSelection.model}
-                      disabled={!currentManufacturerData}
-                      onChange={(e) => handleCameraSelectionChange(contextIndex, 'model', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Model</option>
-                      {currentManufacturerData?.models.map(mod => <option key={mod.name} value={mod.name}>{mod.name}</option>)}   
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor={`resolution-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Sensor Mode/Resolution</label>
-                    <select
-                      id={`resolution-${contextIndex}`}
-                      key={`resolution-select-${currentSelection.model}-${contextIndex}`} // Key for re-render
-                      disabled={!currentModelData}
-                      value={currentSelection.resolutionName || ''}
-                      onChange={(e) => handleCameraSelectionChange(contextIndex, 'resolution', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select Resolution</option>
-                      {currentModelData?.resolutions.map(res => <option key={res.name} value={res.name}>{res.name} ({res.width}x{res.height})</option>)} 
-                    </select>
-                  </div>
+    <div>
+      <Header onExport={handleExport} onImport={handleImport} />
+      <div className="p-6">
+        <div className="space-y-8">
+                <div className="text-gray-700 bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <p>
+                    Thanks for checking out my ASC-FDL creation tool. FDL stands for Frameline Decision List and will be similar to CDL but with photoshop style layer controls. The ASC comittee is still working on definining the release SPEC for FDL - so this tool is extremely ALPHA. As far as I know, FDL is only supported in colorfront as of now. Software companies and Camera companies should support FDL once the spec is final. For the meantime, I will continue to build this app so it's ready to go once the SPEC is live. I'll add backwards compatibility as well so you can use it to generate regular frameline files for Arri/Red/Sony. Please play around and test this. Please send me ideas and feedback. I'm pretty quick to respond - I want this tool to be great. <a href="mailto:jamiemetzger@gmail.com" className="text-blue-600 hover:underline">jamiemetzger@gmail.com</a>
+                  </p>
                 </div>
 
-                {/* New Row for Anamorphic Squeeze and Recording Codec */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3"> {/* Added mt-3 for spacing */}
-                  <div>
-                    <label htmlFor={`anamorphic-squeeze-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Anamorphic Squeeze</label>
-                    <select
-                      id={`anamorphic-squeeze-${contextIndex}`}
-                      value={primaryCanvas?.anamorphic_squeeze || 1.0} // Default to 1.0 if not set
-                      onChange={(e) => {
-                        if (primaryCanvas) {
-                          updateCanvas(contextIndex, 0, { anamorphic_squeeze: parseFloat(e.target.value) });
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                {/* Camera & Canvas Setups */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-medium text-gray-900">Camera & Canvas Setups</h2>
+                    <button
+                      onClick={addContext}
+                      className="fdl-button-primary text-sm"
                     >
-                      {[1.0, 1.25, 1.30, 1.33, 1.5, 1.65, 1.8, 1.85, 2.0].map(val => (
-                        <option key={val} value={val}>{val.toFixed(2)}</option>
-                      ))}
-                    </select>
+                      Add Camera Setup
+                    </button>
                   </div>
-                  {currentSelection.manufacturer === 'ARRI' && ( // Use cameraSelections for conditional rendering
-                    <div>
-                      <label htmlFor={`recording-codec-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Recording Codec</label>
-                      <select
-                        id={`recording-codec-${contextIndex}`}
-                        value={primaryCanvas?.recording_codec || ''}
-                        onChange={(e) => {
-                          if (primaryCanvas) {
-                            updateCanvas(contextIndex, 0, { recording_codec: e.target.value });
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Select Codec</option>
-                        <option value="Apple ProRes">Apple ProRes</option>
-                        <option value="ARRIRAW">ARRIRAW</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
+                  <div className="space-y-4">
+                    {(fdl.contexts || []).map((context, contextIndex) => {
+                      // Derive current manufacturer and model from cameraSelections state
+                      const currentSelection = selectedCameraSelections[contextIndex] || { manufacturer: '', model: '', resolutionName: '' };
+                      const currentManufacturerData = CAMERA_DATA.find(m => m.name === currentSelection.manufacturer);
+                      const currentModelData = currentManufacturerData?.models.find(mod => mod.name === currentSelection.model);
+                      
+                      const primaryCanvas = context.canvases && context.canvases.length > 0 ? context.canvases[0] : null;
 
-                {/* Primary Canvas Details */} 
-                {primaryCanvas && (
-                  <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Context Label (Internal Use)
-                        </label>
-                        <input
-                          type="text"
-                          value={context.label || ''}
-                          onChange={(e) => {
-                            const newContexts = [...(fdl.contexts || [])];
-                            if(newContexts[contextIndex]) {
-                                newContexts[contextIndex] = {...newContexts[contextIndex], label: e.target.value };
-                                updateFDL({contexts: newContexts});
-                            }
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="e.g., A-Cam, Scene 5 Setup"
-                        />
-                      </div>
-                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Canvas Label (FDL Spec)
-                        </label>
-                        <input
-                          type="text"
-                          value={primaryCanvas.label || ''}
-                          onChange={(e) => updateCanvas(contextIndex, 0, { label: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="e.g., Main Sensor, VFX Plate"
-                        />
-                      </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Canvas Width (px)
-                        </label>
-                        <input
-                          type="number"
-                          value={primaryCanvas.dimensions?.width || ''}
-                          readOnly 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Canvas Height (px)
-                        </label>
-                        <input
-                          type="number"
-                          value={primaryCanvas.dimensions?.height || ''}
-                          readOnly 
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Advanced Settings Toggle */}
-                    <div className="mt-4">
-                      <button 
-                        onClick={() => toggleAdvancedSettings(contextIndex)}
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        {showAdvancedSettings[contextIndex] ? 'Hide' : 'Show'} Advanced Canvas Settings
-                      </button>
-                    </div>
-
-                    {/* ADVANCED CANVAS FIELDS - Conditionally Rendered */}
-                    {showAdvancedSettings[contextIndex] && primaryCanvas && (
-                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
-                        <h5 className="text-sm font-semibold text-gray-700">Advanced Canvas Properties</h5>
-                        
-                        {/* Effective Dimensions */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Effective Width (px)</label>
-                            <input type="number" value={primaryCanvas.effective_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_dimensions: { ...(primaryCanvas.effective_dimensions || { width:0, height:0 }), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Effective Height (px)</label>
-                            <input type="number" value={primaryCanvas.effective_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_dimensions: { ...(primaryCanvas.effective_dimensions || { width:0, height:0 }), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                        </div>
-
-                        {/* Effective Anchor Point */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Effective Anchor X</label>
-                            <input type="number" value={primaryCanvas.effective_anchor_point?.x || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_anchor_point: { ...(primaryCanvas.effective_anchor_point || {x:0, y:0}), x: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Effective Anchor Y</label>
-                            <input type="number" value={primaryCanvas.effective_anchor_point?.y || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_anchor_point: { ...(primaryCanvas.effective_anchor_point || {x:0, y:0}), y: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                        </div>
-
-                        {/* Photosite Dimensions */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Photosite Width (px)</label>
-                            <input type="number" value={primaryCanvas.photosite_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { photosite_dimensions: { ...(primaryCanvas.photosite_dimensions || {width:0, height:0}), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Photosite Height (px)</label>
-                            <input type="number" value={primaryCanvas.photosite_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { photosite_dimensions: { ...(primaryCanvas.photosite_dimensions || {width:0, height:0}), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                        </div>
-
-                        {/* Physical Dimensions */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Physical Width (mm)</label>
-                            <input type="number" step="0.01" value={primaryCanvas.physical_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { physical_dimensions: { ...(primaryCanvas.physical_dimensions || {width:0, height:0}), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Physical Height (mm)</label>
-                            <input type="number" step="0.01" value={primaryCanvas.physical_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { physical_dimensions: { ...(primaryCanvas.physical_dimensions || {width:0, height:0}), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
-                          </div>
+                      return (
+                      <div key={contextIndex} className="border border-gray-200 rounded-lg p-4"> {/* Use contextIndex as key */}
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-medium text-gray-900">{context.label || `Camera Setup ${contextIndex + 1}`}</h3>
+                          <button
+                            onClick={() => removeContext(contextIndex)}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                          >
+                            Remove
+                          </button>
                         </div>
                         
+                        {/* Canvas Definition - MOVED UP */}
+                        <div className="bg-gray-50 p-4 rounded-md mb-4 space-y-3">
+                          <h4 className="text-md font-medium text-gray-800 mb-2 border-b pb-2">Canvas Definition</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label htmlFor={`manufacturer-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Manufacturer</label>
+                              <select
+                                id={`manufacturer-${contextIndex}`}
+                                value={currentSelection.manufacturer}
+                                onChange={(e) => handleCameraSelectionChange(contextIndex, 'manufacturer', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Select Manufacturer</option>
+                                {CAMERA_DATA.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label htmlFor={`model-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Camera Model</label>
+                              <select
+                                id={`model-${contextIndex}`}
+                                key={`model-select-${currentSelection.manufacturer}-${currentSelection.model}-${contextIndex}`} // Key for re-render
+                                value={currentSelection.model}
+                                disabled={!currentManufacturerData}
+                                onChange={(e) => handleCameraSelectionChange(contextIndex, 'model', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Select Model</option>
+                                {currentManufacturerData?.models.map(mod => <option key={mod.name} value={mod.name}>{mod.name}</option>)}   
+                              </select>
+                            </div>
+                            <div>
+                              <label htmlFor={`resolution-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Sensor Mode/Resolution</label>
+                              <select
+                                id={`resolution-${contextIndex}`}
+                                key={`resolution-select-${currentSelection.model}-${contextIndex}`} // Key for re-render
+                                disabled={!currentModelData}
+                                value={currentSelection.resolutionName || ''}
+                                onChange={(e) => handleCameraSelectionChange(contextIndex, 'resolution', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Select Resolution</option>
+                                {currentModelData?.resolutions.map(res => <option key={res.name} value={res.name}>{res.name} ({res.width}x{res.height})</option>)} 
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* New Row for Anamorphic Squeeze and Recording Codec */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3"> {/* Added mt-3 for spacing */}
+                            <div>
+                              <label htmlFor={`anamorphic-squeeze-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Anamorphic Squeeze</label>
+                              <select
+                                id={`anamorphic-squeeze-${contextIndex}`}
+                                value={primaryCanvas?.anamorphic_squeeze || 1.0} // Default to 1.0 if not set
+                                onChange={(e) => {
+                                  if (primaryCanvas) {
+                                    updateCanvas(contextIndex, 0, { anamorphic_squeeze: parseFloat(e.target.value) });
+                                  }
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                {[1.0, 1.25, 1.30, 1.33, 1.5, 1.65, 1.8, 1.85, 2.0].map(val => (
+                                  <option key={val} value={val}>{val.toFixed(2)}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {currentSelection.manufacturer === 'ARRI' && ( // Use cameraSelections for conditional rendering
+                              <div>
+                                <label htmlFor={`recording-codec-${contextIndex}`} className="block text-sm font-medium text-gray-700 mb-1">Recording Codec</label>
+                                <select
+                                  id={`recording-codec-${contextIndex}`}
+                                  value={primaryCanvas?.recording_codec || ''}
+                                  onChange={(e) => {
+                                    if (primaryCanvas) {
+                                      updateCanvas(contextIndex, 0, { recording_codec: e.target.value });
+                                    }
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                  <option value="">Select Codec</option>
+                                  <option value="Apple ProRes">Apple ProRes</option>
+                                  <option value="ARRIRAW">ARRIRAW</option>
+                                </select>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Primary Canvas Details */} 
+                          {primaryCanvas && (
+                            <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                               <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Context Label (Internal Use)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={context.label || ''}
+                                    onChange={(e) => {
+                                      const newContexts = [...(fdl.contexts || [])];
+                                      if(newContexts[contextIndex]) {
+                                          newContexts[contextIndex] = {...newContexts[contextIndex], label: e.target.value };
+                                          updateFDL({contexts: newContexts});
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., A-Cam, Scene 5 Setup"
+                                  />
+                                </div>
+                                 <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Canvas Label (FDL Spec)
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={primaryCanvas.label || ''}
+                                    onChange={(e) => updateCanvas(contextIndex, 0, { label: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="e.g., Main Sensor, VFX Plate"
+                                  />
+                                </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Canvas Width (px)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={primaryCanvas.dimensions?.width || ''}
+                                    readOnly 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Canvas Height (px)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={primaryCanvas.dimensions?.height || ''}
+                                    readOnly 
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Advanced Settings Toggle */}
+                              <div className="mt-4">
+                                <button 
+                                  onClick={() => toggleAdvancedSettings(contextIndex)}
+                                  className="text-sm text-blue-600 hover:text-blue-800"
+                                >
+                                  {showAdvancedSettings[contextIndex] ? 'Hide' : 'Show'} Advanced Canvas Settings
+                                </button>
+                              </div>
+
+                              {/* ADVANCED CANVAS FIELDS - Conditionally Rendered */}
+                              {showAdvancedSettings[contextIndex] && primaryCanvas && (
+                                <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+                                  <h5 className="text-sm font-semibold text-gray-700">Advanced Canvas Properties</h5>
+                                  
+                                  {/* Effective Dimensions */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Effective Width (px)</label>
+                                      <input type="number" value={primaryCanvas.effective_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_dimensions: { ...(primaryCanvas.effective_dimensions || { width:0, height:0 }), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Effective Height (px)</label>
+                                      <input type="number" value={primaryCanvas.effective_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_dimensions: { ...(primaryCanvas.effective_dimensions || { width:0, height:0 }), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                  </div>
+
+                                  {/* Effective Anchor Point */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Effective Anchor X</label>
+                                      <input type="number" value={primaryCanvas.effective_anchor_point?.x || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_anchor_point: { ...(primaryCanvas.effective_anchor_point || {x:0, y:0}), x: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Effective Anchor Y</label>
+                                      <input type="number" value={primaryCanvas.effective_anchor_point?.y || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_anchor_point: { ...(primaryCanvas.effective_anchor_point || {x:0, y:0}), y: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                  </div>
+
+                                  {/* Photosite Dimensions */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Photosite Width (px)</label>
+                                      <input type="number" value={primaryCanvas.photosite_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { photosite_dimensions: { ...(primaryCanvas.photosite_dimensions || {width:0, height:0}), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Photosite Height (px)</label>
+                                      <input type="number" value={primaryCanvas.photosite_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { photosite_dimensions: { ...(primaryCanvas.photosite_dimensions || {width:0, height:0}), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                  </div>
+
+                                  {/* Physical Dimensions */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Physical Width (mm)</label>
+                                      <input type="number" step="0.01" value={primaryCanvas.physical_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { physical_dimensions: { ...(primaryCanvas.physical_dimensions || {width:0, height:0}), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-600 mb-1">Physical Height (mm)</label>
+                                      <input type="number" step="0.01" value={primaryCanvas.physical_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { physical_dimensions: { ...(primaryCanvas.physical_dimensions || {width:0, height:0}), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                                    </div>
+                                  </div>
+                                  
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      )
+                    })}
+                    
+                    {(!fdl.contexts || fdl.contexts.length === 0) && (
+                      <div className="text-center py-8 text-gray-500">
+                        No Camera Setups defined. Click "Add Camera Setup" to get started.
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            </div>
-            )
-          })}
-          
-          {(!fdl.contexts || fdl.contexts.length === 0) && (
-            <div className="text-center py-8 text-gray-500">
-              No Camera Setups defined. Click "Add Camera Setup" to get started.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Framing Intents */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-700">Framing Intents (Drag to reorder, Top = Highest Priority)</h2>
-          <button onClick={addFramingIntent} className="fdl-button-primary text-sm">Add Intent</button>
-        </div>
-        <div className="space-y-4">
-          {(fdl.framing_intents || []).map((intent, index) => {
-            const intentColor = intentColors[index % intentColors.length];
-            const backgroundColor = `${intentColor}${intentBackgroundOpacity}`;
-            
-            return (
-              <div 
-                key={intent.id || index} 
-                className="mb-6 p-5 border border-gray-200 rounded-lg shadow-sm"
-                style={{ backgroundColor: backgroundColor }}
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-medium text-gray-900">Intent {index + 1}</h3>
-                    <button 
-                      onClick={() => moveFramingIntent(index, 'up')}
-                      disabled={index === 0}
-                      className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Move Up (Higher Priority)"
-                    >
-                      &#x25B2;
-                    </button>
-                    <button 
-                      onClick={() => moveFramingIntent(index, 'down')}
-                      disabled={index === (fdl.framing_intents || []).length - 1}
-                      className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Move Down (Lower Priority)"
-                    >
-                      &#x25BC;
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => removeFramingIntent(index)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                  >
-                    Remove
-                  </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quick Aspect Ratio
+
+                {/* Framing Intents */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold text-gray-700">Framing Intents (Drag to reorder, Top = Highest Priority)</h2>
+                    <button onClick={addFramingIntent} className="fdl-button-primary text-sm">Add Intent</button>
+                  </div>
+                  <div className="space-y-4">
+                    {(fdl.framing_intents || []).map((intent, index) => {
+                      const intentColor = intentColors[index % intentColors.length];
+                      const backgroundColor = `${intentColor}${intentBackgroundOpacity}`;
+                      
+                      return (
+                        <div 
+                          key={intent.id || index} 
+                          className="mb-6 p-5 border border-gray-200 rounded-lg shadow-sm"
+                          style={{ backgroundColor: backgroundColor }}
+                        >
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center space-x-2">
+                              <h3 className="font-medium text-gray-900">Intent {index + 1}</h3>
+                              <button 
+                                onClick={() => moveFramingIntent(index, 'up')}
+                                disabled={index === 0}
+                                className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Move Up (Higher Priority)"
+                              >
+                                &#x25B2;
+                              </button>
+                              <button 
+                                onClick={() => moveFramingIntent(index, 'down')}
+                                disabled={index === (fdl.framing_intents || []).length - 1}
+                                className="p-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Move Down (Lower Priority)"
+                              >
+                                &#x25BC;
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => removeFramingIntent(index)}
+                              className="text-red-600 hover:text-red-800 text-sm"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Quick Aspect Ratio
+                              </label>
+                              <select
+                                onChange={(e) => {
+                                  const selectedLabelValue = e.target.value;
+                                  const ratioObj = COMMON_ASPECT_RATIOS.find(r => r.label === selectedLabelValue);
+                                  if (ratioObj) {
+                                    updateFramingIntent(index, { aspect_ratio: ratioObj.ratio, label: selectedLabelValue });
+                                  } else {
+                                    if (selectedLabelValue === '') { 
+                                         updateFramingIntent(index, { 
+                                            aspect_ratio: { width: intent.aspect_ratio.width, height: intent.aspect_ratio.height } 
+                                        });
+                                    } else {
+                                         updateFramingIntent(index, { label: intent.label || '' });
+                                    }
+                                  }
+                                }}
+                                value={COMMON_ASPECT_RATIOS.find(r => r.ratio.width === intent.aspect_ratio.width && r.ratio.height === intent.aspect_ratio.height)?.label || ''}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Custom...</option>
+                                {COMMON_ASPECT_RATIOS.map((ratio) => (
+                                  <option key={ratio.label} value={ratio.label}>
+                                    {ratio.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Label
+                              </label>
+                              <input
+                                type="text"
+                                value={intent.label || ''}
+                                onChange={(e) => updateFramingIntent(index, { label: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="e.g., 16:9 or Safety"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                ID
+                              </label>
+                              <input
+                                type="text"
+                                value={intent.id}
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Second Row for Protection, Width, Height */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Protection (%)
+                              </label>
+                              <input
+                                type="number"
+                                value={intent.protection || ''}
+                                onChange={(e) => updateFramingIntent(index, { 
+                                  protection: e.target.value ? Number(e.target.value) : undefined
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Optional (0-99)"
+                                min="0"
+                                max="99"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Width (Aspect Ratio Unit)
+                              </label>
+                              <input
+                                type="number"
+                                value={intent.aspect_ratio.width}
+                                onChange={(e) => updateFramingIntent(index, { 
+                                  aspect_ratio: { ...intent.aspect_ratio, width: Number(e.target.value) }
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Height (Aspect Ratio Unit)
+                              </label>
+                              <input
+                                type="number"
+                                value={intent.aspect_ratio.height}
+                                onChange={(e) => updateFramingIntent(index, { 
+                                  aspect_ratio: { ...intent.aspect_ratio, height: Number(e.target.value) }
+                                })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {(!fdl.framing_intents || fdl.framing_intents.length === 0) && (
+                      <div className="text-center py-8 text-gray-500">
+                        No framing intents defined. Click "Add Intent" to get started.
+                      </div>
+                    )}
+
+                    <div className="pt-4 mt-4 border-t border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Default Framing Intent
+                      </label>
+                      <select
+                        value={fdl.default_framing_intent || ''}
+                        onChange={(e) => updateFDL({ default_framing_intent: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">None</option>
+                        {(fdl.framing_intents || []).map((intent) => (
+                          <option key={intent.id} value={intent.id}>
+                            {intent.label || intent.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visualizer Context Selector - Placed above the visualizer */}
+                {(fdl.contexts && fdl.contexts.length > 0) && (
+                  <div className="bg-white rounded-lg shadow p-4 mb-6">
+                    <label htmlFor="visualized-context-select" className="block text-sm font-medium text-gray-700 mb-1">
+                      Select Camera Setup to Visualize:
                     </label>
                     <select
-                      onChange={(e) => {
-                        const selectedLabelValue = e.target.value;
-                        const ratioObj = COMMON_ASPECT_RATIOS.find(r => r.label === selectedLabelValue);
-                        if (ratioObj) {
-                          updateFramingIntent(index, { aspect_ratio: ratioObj.ratio, label: selectedLabelValue });
-                        } else {
-                          if (selectedLabelValue === '') { 
-                               updateFramingIntent(index, { 
-                                  aspect_ratio: { width: intent.aspect_ratio.width, height: intent.aspect_ratio.height } 
-                              });
-                          } else {
-                               updateFramingIntent(index, { label: intent.label || '' });
-                          }
-                        }
-                      }}
-                      value={COMMON_ASPECT_RATIOS.find(r => r.ratio.width === intent.aspect_ratio.width && r.ratio.height === intent.aspect_ratio.height)?.label || ''}
+                      id="visualized-context-select"
+                      value={selectedVisualizedContextIndex === null ? '' : selectedVisualizedContextIndex}
+                      onChange={(e) => setSelectedVisualizedContextIndex(e.target.value === '' ? null : Number(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="">Custom...</option>
-                      {COMMON_ASPECT_RATIOS.map((ratio) => (
-                        <option key={ratio.label} value={ratio.label}>
-                          {ratio.label}
-                        </option>
-                      ))}
+                      {(fdl.contexts || []).map((context, index) => {
+                        const selection = selectedCameraSelections[index] || { manufacturer: '', model: '' };
+                        return (
+                          <option key={`vis-ctx-${index}`} value={index}>
+                            {context.label || `Camera Setup ${index + 1}`}
+                            {selection.model ? ` (${selection.manufacturer} ${selection.model})` : ''}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Label
-                    </label>
-                    <input
-                      type="text"
-                      value={intent.label || ''}
-                      onChange={(e) => updateFramingIntent(index, { label: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., 16:9 or Safety"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ID
-                    </label>
-                    <input
-                      type="text"
-                      value={intent.id}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none"
-                    />
-                  </div>
-                </div>
+                )}
 
-                {/* Second Row for Protection, Width, Height */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Protection (%)
-                    </label>
-                    <input
-                      type="number"
-                      value={intent.protection || ''}
-                      onChange={(e) => updateFramingIntent(index, { 
-                        protection: e.target.value ? Number(e.target.value) : undefined
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Optional (0-99)"
-                      min="0"
-                      max="99"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Width (Aspect Ratio Unit)
-                    </label>
-                    <input
-                      type="number"
-                      value={intent.aspect_ratio.width}
-                      onChange={(e) => updateFramingIntent(index, { 
-                        aspect_ratio: { ...intent.aspect_ratio, width: Number(e.target.value) }
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Height (Aspect Ratio Unit)
-                    </label>
-                    <input
-                      type="number"
-                      value={intent.aspect_ratio.height}
-                      onChange={(e) => updateFramingIntent(index, { 
-                        aspect_ratio: { ...intent.aspect_ratio, height: Number(e.target.value) }
-                      })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          {(!fdl.framing_intents || fdl.framing_intents.length === 0) && (
-            <div className="text-center py-8 text-gray-500">
-              No framing intents defined. Click "Add Intent" to get started.
-            </div>
-          )}
-        </div>
-      </div>
+                {/* FDL Visualizer */}
+                <FDLVisualizer fdl={fdl} visualizedContextIndex={selectedVisualizedContextIndex} />
 
-      {/* Visualizer Context Selector - Placed above the visualizer */}
-      {(fdl.contexts && fdl.contexts.length > 0) && (
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <label htmlFor="visualized-context-select" className="block text-sm font-medium text-gray-700 mb-1">
-            Select Camera Setup to Visualize:
-          </label>
-          <select
-            id="visualized-context-select"
-            value={selectedVisualizedContextIndex === null ? '' : selectedVisualizedContextIndex}
-            onChange={(e) => setSelectedVisualizedContextIndex(e.target.value === '' ? null : Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {(fdl.contexts || []).map((context, index) => {
-              const selection = selectedCameraSelections[index] || { manufacturer: '', model: '' };
-              return (
-                <option key={`vis-ctx-${index}`} value={index}>
-                  {context.label || `Camera Setup ${index + 1}`}
-                  {selection.model ? ` (${selection.manufacturer} ${selection.model})` : ''}
-                </option>
-              );
-            })}
-          </select>
-        </div>
-      )}
-
-      {/* FDL Visualizer */}
-      <FDLVisualizer fdl={fdl} visualizedContextIndex={selectedVisualizedContextIndex} />
-
-      {/* Frame Leader Editor - New Section */}
-      {(fdl.contexts && fdl.contexts.length > 0 && selectedVisualizedContextIndex !== null) && (
-        <FrameLeaderEditor 
-          fdl={fdl} 
-          visualizedContextIndex={selectedVisualizedContextIndex} 
-          onChange={updateFDL}
-        />
-      )}
-
-      {/* General Information */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">General Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              UUID
-            </label>
-            <input
-              type="text"
-              value={fdl.uuid}
-              onChange={(e) => updateFDL({ uuid: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              FDL Creator
-            </label>
-            <input
-              type="text"
-              value={fdl.fdl_creator || ''}
-              onChange={(e) => updateFDL({ fdl_creator: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Creator name or organization"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Default Framing Intent
-            </label>
-            <select
-              value={fdl.default_framing_intent || ''}
-              onChange={(e) => updateFDL({ default_framing_intent: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">None</option>
-              {(fdl.framing_intents || []).map((intent) => (
-                <option key={intent.id} value={intent.id}>
-                  {intent.label || intent.id}
-                </option>
-              ))}
-            </select>
-          </div>
+                {/* Frame Leader Editor - New Section */}
+                {(fdl.contexts && fdl.contexts.length > 0 && selectedVisualizedContextIndex !== null) && (
+                  <FrameLeaderEditor 
+                    fdl={fdl} 
+                    visualizedContextIndex={selectedVisualizedContextIndex} 
+                    onChange={updateFDL}
+                  />
+                )}
         </div>
       </div>
     </div>
   );
 };
 
-export default FDLEditor; 
+export default FDLEditor;

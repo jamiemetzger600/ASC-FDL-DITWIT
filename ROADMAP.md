@@ -22,6 +22,28 @@ This document outlines planned features, improvements, and to-do items for the A
 - [ ] **Field of View (FoV) Calculator:** Implement a Field of View calculator. It should take the source Camera/Model/Resolution and a user-inputted lens, and allow comparison against various other camera formats (e.g., 35mm film, 65mm film, 16mm film), resolutions, and lenses, providing a visual representation of the FoV differences.
 - [ ] **Stabilization Preview for Protection:** Add a visual "stabilization" preview linked to the "protection" setting for framing intents. This should be a user-adjustable slider that demonstrates how increased protection provides more room for stabilization at the cost of resolution.
 
+## Project File System & Asset Management
+
+- [ ] **FDL Project File Format (.fdlp):** Create a comprehensive project file format that extends beyond standard FDL to include:
+  - [ ] **Core FDL Data:** Standard ASC-FDL specification data
+  - [ ] **Frame Leader Settings:** All custom text elements, positioning, styling, and visibility settings
+  - [ ] **Custom Assets Bundle:** Embedded custom logos/images and fonts as base64 data URIs
+  - [ ] **Project Metadata:** Creation date, app version, creator info, project name
+  - [ ] **Asset Management:** Track and bundle all user-uploaded content (fonts, images)
+- [ ] **Project Import/Export System:** 
+  - [ ] **Smart Asset Handling:** Automatically embed and extract custom assets when saving/loading projects
+  - [ ] **Version Compatibility:** Handle project files created with different app versions
+  - [ ] **Asset Integrity:** Validate that all referenced assets are properly bundled
+  - [ ] **Fallback Handling:** Graceful degradation when custom fonts/assets are missing
+- [ ] **Enhanced UI for Project Management:**
+  - [ ] **Project vs. FDL Export Options:** Clear distinction between exporting standard FDL vs. complete project
+  - [ ] **Asset Preview:** Show all custom assets bundled in a project before export
+  - [ ] **Project Metadata Editor:** Allow users to add project name, description, notes
+- [ ] **Collaboration Features:**
+  - [ ] **Project Sharing:** Generate shareable project files that preserve all custom work
+  - [ ] **Asset Report:** List all custom fonts/logos used in a project for team coordination
+  - [ ] **Cross-Platform Compatibility:** Ensure projects work across different environments
+
 ## Guiding Principles
 
 *   **Simplicity:** Always prioritize keeping the application simple and focused on making FDL creation as easy as possible.
