@@ -1318,11 +1318,13 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             </div>
             
             <div className="space-y-4">
-              {/* Logo Size Control */}
+              {/* Logo Controls */}
               {settings.customLogoEnabled && settings.customLogoUrl && (
                 <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Logo Size</h4>
-                  <div>
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Logo Controls</h4>
+                  
+                  {/* Logo Size */}
+                  <div className="mb-3">
                     <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.customLogoSize || 15}%</label>
                     <input
                       type="range"
@@ -1333,6 +1335,34 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                       onChange={e => handleGenericSettingChange('customLogoSize', Number(e.target.value))}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
+                  </div>
+                  
+                  {/* Logo Position */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">X Position: {settings.customLogoPosition?.x || 50}%</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="1" 
+                        value={settings.customLogoPosition?.x || 50} 
+                        onChange={e => handleGenericSettingChange('customLogoPosition', { ...(settings.customLogoPosition || {x:50,y:50}), x: Number(e.target.value)})} 
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Y Position: {settings.customLogoPosition?.y || 50}%</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        step="1" 
+                        value={settings.customLogoPosition?.y || 50} 
+                        onChange={e => handleGenericSettingChange('customLogoPosition', { ...(settings.customLogoPosition || {x:50,y:50}), y: Number(e.target.value)})} 
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                      />
+                    </div>
                   </div>
                 </div>
               )}
