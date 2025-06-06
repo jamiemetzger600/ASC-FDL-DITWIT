@@ -70,12 +70,12 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport }) => {
   };
 
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-gray-50 dark:bg-gray-800 shadow-sm border-b border-gray-400 dark:border-gray-600 sticky top-0 z-50">
       <div className="fdl-container">
         <div className="flex items-center justify-between h-16">
           {/* Logo/Title */}
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-semibold text-gray-900">
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
               ASC-DIT-FDL
             </h1>
           </div>

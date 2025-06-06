@@ -52,3 +52,17 @@ export default tseslint.config({
   },
 })
 ```
+
+# How to run the web app
+
+To run the web app, you need to be in the `web-app` directory.
+
+From the root of the project, run the following commands:
+
+```bash
+cd web-app
+npm install
+npm run dev
+```
+
+This will start a development server, and the application will be available at [http://localhost:5173](http://localhost:5173).

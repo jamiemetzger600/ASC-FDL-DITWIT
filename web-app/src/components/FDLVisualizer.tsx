@@ -10,10 +10,10 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
   const [showTechInfo, setShowTechInfo] = useState(false);
 
   const mainContainerStyle: React.CSSProperties = {
-    border: '1px solid #e2e8f0',
+    border: '2px solid #9ca3af',
     borderRadius: '0.5rem',
     padding: '1.5rem',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--bg-color, #f9fafb)',
     display: 'flex',
     flexDirection: 'row',
     gap: '1.5rem',
@@ -240,12 +240,12 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         </svg>
       );
     } else {
-      canvasDisplay = <p className="text-sm text-gray-500">Selected canvas dimensions are invalid (0 or less).</p>;
+      canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">Selected canvas dimensions are invalid (0 or less).</p>;
     }
   } else if (visualizedContextIndex === null && fdl.contexts && fdl.contexts.length > 0) {
-    canvasDisplay = <p className="text-sm text-gray-500">Select a Camera Setup from the dropdown above to visualize.</p>;
+    canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">Select a Camera Setup from the dropdown above to visualize.</p>;
   } else {
-    canvasDisplay = <p className="text-sm text-gray-500">No Camera Setup selected or available to display intents.</p>;
+    canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">No Camera Setup selected or available to display intents.</p>;
   }
 
   const renderTechInfoPanel = () => {
@@ -336,18 +336,17 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
   };
 
   return (
-    <div style={mainContainerStyle} className="fdl-visualizer-main-container">
-      <div style={visualizerAreaStyle} className="fdl-visualizer-area">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 self-start">Frame Line Preview</h3>
+    <div className="bg-white dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-600 rounded-lg p-6 mt-6 flex flex-row gap-6">
+      <div className="flex-grow flex flex-col items-center">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4 self-start">Frame Line Preview</h3>
         <button 
           onClick={() => setShowTechInfo(!showTechInfo)} 
-          style={toggleButtonStyle}
-          className="fdl-button-secondary text-sm mb-3"
+          className="fdl-button-secondary text-sm mb-3 self-start"
         >
           {showTechInfo ? 'Hide' : 'Show'} Technical Info
         </button>
         {canvasDisplay}
-        <div style={imageSelectionBarStyle}>
+        <div className="w-full h-15 bg-gray-200 dark:bg-gray-600 border border-gray-400 dark:border-gray-500 rounded mt-4 flex items-center justify-center text-gray-600 dark:text-gray-400 text-sm">
           Image Selection Bar (Placeholder)
         </div>
       </div>

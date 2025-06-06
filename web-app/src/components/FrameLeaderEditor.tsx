@@ -73,21 +73,27 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   };
   
   const getDefaultFrameLeaderSettings = (): FrameLeaderSettings => ({
-    title: { text: 'PRODUCTION TITLE', fontSize: 20, position: { x: 400, y: 35 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false },
-    director: { text: 'Director Name', fontSize: 14, position: { x: 400, y: 60 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false },
-    dp: { text: 'DP Name', fontSize: 14, position: { x: 400, y: 80 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false }, 
-    text1: { text: '', fontSize: 12, position: { x: 400, y: svgPreviewViewBoxHeight - 40 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false },
-    text2: { text: '', fontSize: 12, position: { x: 400, y: svgPreviewViewBoxHeight - 25 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false },
+    title: { text: 'PRODUCTION TITLE', fontSize: 20, position: { x: 400, y: 35 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: true },
+    director: { text: 'Director: ', fontSize: 14, position: { x: 400, y: 60 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: true },
+    dp: { text: 'DP: ', fontSize: 14, position: { x: 400, y: 80 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: true }, 
+    text1: { text: '', fontSize: 12, position: { x: 400, y: svgPreviewViewBoxHeight - 40 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: false },
+    text2: { text: '', fontSize: 12, position: { x: 400, y: svgPreviewViewBoxHeight - 25 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: false },
     intentVisibility: createInitialIntentVisibility(),
     centerMarkerEnabled: true,
     centerMarkerSize: 28,
     siemensStarsEnabled: true,
     siemensStarsSize: 35,
     anamorphicDesqueezeInPreview: false,
-    customLogoEnabled: false,
+        customLogoEnabled: false,
     customLogoUrl: null,
-    customLogoSize: 15, 
+    customLogoSize: 15,
     customLogoPosition: { x: 50, y: 50 },
+    showCameraInfo: true,
+    showPixelDimensions: true,
+    showSensorDimensions: true,
+    showFormatArrow: true,
+    cameraInfoPosition: { x: 400, y: 120 },
+    cameraInfoFontSize: 12,
     customFonts: [],
     customImages: [], 
   });
@@ -134,6 +140,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     () => sanitizeFilename(getDefaultFrameLeaderSettings().title.text) || 'frame-leader'
   );
   const [isFilenameManuallyEdited, setIsFilenameManuallyEdited] = useState<boolean>(false);
+  const [openFormattingDropdown, setOpenFormattingDropdown] = useState<string | null>(null);
+  const [isFullscreenPreview, setIsFullscreenPreview] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -148,6 +156,28 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       setExportFilename(sanitizeFilename(settings.title.text) || 'frame-leader');
     }
   }, [settings?.title?.text, isFilenameManuallyEdited]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openFormattingDropdown && !(event.target as Element).closest('.relative')) {
+        setOpenFormattingDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openFormattingDropdown]);
+
+  // Handle escape key to close fullscreen preview
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isFullscreenPreview) {
+        setIsFullscreenPreview(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => document.removeEventListener('keydown', handleEscapeKey);
+  }, [isFullscreenPreview]);
 
   const handleIntentVisibilityChange = (intentId: string, isVisible: boolean) => {
     if (!primaryCanvas || visualizedContextIndex === null) return;
@@ -409,25 +439,54 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     if (!settings.siemensStarsEnabled || !primaryCanvas) return null;
     const scaledDims = getScaledCanvasDimensions();
     if (!scaledDims) return null;
-    const { scaledCanvasWidth, scaledCanvasHeight, canvasRectX, canvasRectY } = scaledDims;
-    const starRadius = settings.siemensStarsSize / 2; 
+    
+    const { scaledCanvasWidth, scaledCanvasHeight, canvasRectX, canvasRectY, overallScale } = scaledDims;
+    
+    // Calculate star radius based on source resolution and scale for high quality
+    const sourceWidth = primaryCanvas.dimensions?.width || 1920;
+    const baseStarSize = settings.siemensStarsSize;
+    const scaledStarRadius = (baseStarSize * overallScale) / 2;
+    
+    // Position stars with margin scaled to resolution
+    const margin = Math.max(5, scaledStarRadius * 0.2);
     const positions = [
-      { x: canvasRectX + starRadius + 5, y: canvasRectY + starRadius + 5 }, 
-      { x: canvasRectX + scaledCanvasWidth - starRadius - 5, y: canvasRectY + starRadius + 5 }, 
-      { x: canvasRectX + starRadius + 5, y: canvasRectY + scaledCanvasHeight - starRadius - 5 }, 
-      { x: canvasRectX + scaledCanvasWidth - starRadius - 5, y: canvasRectY + scaledCanvasHeight - starRadius - 5 }, 
+      { x: canvasRectX + scaledStarRadius + margin, y: canvasRectY + scaledStarRadius + margin },
+      { x: canvasRectX + scaledCanvasWidth - scaledStarRadius - margin, y: canvasRectY + scaledStarRadius + margin },
+      { x: canvasRectX + scaledStarRadius + margin, y: canvasRectY + scaledCanvasHeight - scaledStarRadius - margin },
+      { x: canvasRectX + scaledCanvasWidth - scaledStarRadius - margin, y: canvasRectY + scaledCanvasHeight - scaledStarRadius - margin },
     ];
-    const numSegments = 16; 
+    
+    // Higher segment count for better quality, especially at higher resolutions
+    const numSegments = Math.max(24, Math.floor(sourceWidth / 100)); // More segments for higher resolution
+    const strokeWidth = Math.max(0.5, scaledStarRadius / 50); // Scale stroke width
+    
     return positions.map((pos, index) => (
       <g key={`siemens-star-${index}`} transform={`translate(${pos.x}, ${pos.y})`}>
-        {Array.from({ length: numSegments }).map((_, i) => (
-          <path
-            key={i}
-            d={`M 0 0 L ${starRadius * Math.cos(2 * Math.PI * i / numSegments)} ${starRadius * Math.sin(2 * Math.PI * i / numSegments)} L ${starRadius * Math.cos(2 * Math.PI * (i + 0.5) / numSegments)} ${starRadius * Math.sin(2 * Math.PI * (i + 0.5) / numSegments)} Z`}
-            fill={i % 2 === 0 ? 'black' : 'white'}
-          />
-        ))}
-        <circle cx="0" cy="0" r={starRadius} stroke="black" strokeWidth="0.5" fill="none" />
+        {Array.from({ length: numSegments }).map((_, i) => {
+          const angle1 = (2 * Math.PI * i) / numSegments;
+          const angle2 = (2 * Math.PI * (i + 0.5)) / numSegments;
+          const x1 = scaledStarRadius * Math.cos(angle1);
+          const y1 = scaledStarRadius * Math.sin(angle1);
+          const x2 = scaledStarRadius * Math.cos(angle2);
+          const y2 = scaledStarRadius * Math.sin(angle2);
+          
+          return (
+            <path
+              key={i}
+              d={`M 0 0 L ${x1} ${y1} L ${x2} ${y2} Z`}
+              fill={i % 2 === 0 ? 'black' : 'white'}
+              stroke="none"
+            />
+          );
+        })}
+        <circle 
+          cx="0" 
+          cy="0" 
+          r={scaledStarRadius} 
+          stroke="black" 
+          strokeWidth={strokeWidth} 
+          fill="none" 
+        />
       </g>
     ));
   };
@@ -455,10 +514,116 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     );
   };
 
+  // Helper to render camera information
+  const renderCameraInfo = () => {
+    if (!settings?.showCameraInfo || !primaryCanvas) return null;
+    
+    const canvas = primaryCanvas;
+    const dimensions = canvas.dimensions;
+    if (!dimensions) return null;
+
+    const cameraName = canvas.label || canvas.source_canvas_id || 'Camera';
+    const sensorFormat = '';
+    const width = dimensions.width;
+    const height = dimensions.height;
+    
+    // Calculate sensor dimensions (this is placeholder - would need actual sensor info)
+    const pixelPitch = 0.00606; // Example for Alexa 35, would need camera-specific data
+    const sensorWidthMm = (width * pixelPitch).toFixed(2);
+    const sensorHeightMm = (height * pixelPitch).toFixed(2);
+    
+    const baseY = settings.cameraInfoPosition?.y || 120;
+    const fontSize = settings.cameraInfoFontSize || 12;
+    const lineHeight = fontSize * 1.4;
+    
+    let yOffset = 0;
+    const elements = [];
+    
+    // Camera name and format
+    elements.push(
+      <text key="camera-name" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
+            fontSize={fontSize + 2} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
+        {`${cameraName}${sensorFormat ? ` | ${sensorFormat}` : ''}`}
+      </text>
+    );
+    yOffset += lineHeight + 4;
+    
+    // Pixel dimensions
+    if (settings.showPixelDimensions) {
+      elements.push(
+        <text key="pixel-dims" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
+              fontSize={fontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
+          {`${width} x ${height}`}
+        </text>
+      );
+      yOffset += lineHeight;
+    }
+    
+    // Sensor dimensions
+    if (settings.showSensorDimensions) {
+      elements.push(
+        <text key="sensor-dims" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
+              fontSize={fontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
+          {`${sensorWidthMm} x ${sensorHeightMm} mm`}
+        </text>
+      );
+      yOffset += lineHeight + 8;
+    }
+    
+    // Format arrow and framing info (if framing intents exist)
+    if (settings.showFormatArrow && validIntents.length > 0) {
+      const primaryIntent = validIntents[0];
+      if (primaryIntent.aspect_ratio) {
+        const aspectRatio = primaryIntent.aspect_ratio.width / primaryIntent.aspect_ratio.height;
+        const cropWidth = Math.round(height * aspectRatio);
+        const cropHeight = height;
+        const cropSensorWidthMm = (cropWidth * pixelPitch).toFixed(2);
+        const cropSensorHeightMm = (cropHeight * pixelPitch).toFixed(2);
+        
+        // Format arrow (triangle)
+        const x = settings.cameraInfoPosition?.x || 400;
+        elements.push(
+          <polygon key="format-arrow" 
+                   points={`${x - 8},${baseY + yOffset - 2} ${x + 8},${baseY + yOffset - 2} ${x},${baseY + yOffset + 6}`}
+                   fill="black" />
+        );
+        yOffset += 12;
+        
+        // Format line
+        const formatText = `${aspectRatio.toFixed(2)}:1 (${cropWidth} x ${cropHeight}) [${cropSensorWidthMm} x ${cropSensorHeightMm} mm]`;
+        elements.push(
+          <text key="format-line" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
+                fontSize={fontSize - 1} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
+            {formatText}
+          </text>
+        );
+      }
+    }
+    
+    return <g key="camera-info">{elements}</g>;
+  };
+
+  // Helper to render all frame leader content (for reuse in preview and fullscreen)
+  const renderFrameLeaderContent = () => (
+    <>
+      <rect x="0" y="0" width={svgPreviewViewBoxWidth} height={svgPreviewViewBoxHeight} fill="#f0f0f0" />
+      {renderFramelines()}
+      {renderCenterMarker()}
+      {renderSiemensStars()}
+      {renderCustomLogo()}
+      {renderCameraInfo()}
+      {renderTextElement('title')}
+      {renderTextElement('director')}
+      {renderTextElement('dp')}
+      {renderTextElement('text1')}
+      {renderTextElement('text2')}
+    </>
+  );
+
   // Helper to render individual text element in preview
   const renderTextElement = (elementKey: 'title' | 'director' | 'dp' | 'text1' | 'text2') => {
     const elSettings = settings[elementKey];
-    if (!elSettings.text) return null;
+    if (!elSettings.text || !elSettings.visible) return null;
     return (
       <text 
         x={elSettings.position.x} 
@@ -631,17 +796,17 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6 mt-8">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6 mt-8">
       <div 
         className="flex justify-between items-center cursor-pointer mb-4 border-b pb-3"
         onClick={() => setIsFrameLeaderSettingsVisible(!isFrameLeaderSettingsVisible)}
       >
         <div className="flex-grow text-center">
-          <h2 className="text-xl font-semibold text-gray-900 inline-block">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 inline-block">
             Frame Leader Setting
           </h2>
         </div>
-        <span className="text-xl text-gray-600">
+        <span className="text-xl text-gray-600 dark:text-gray-400">
           {isFrameLeaderSettingsVisible ? '\u25B2' : '\u25BC'} 
         </span>
       </div>
@@ -651,18 +816,14 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
           {/* Section 1: Live Preview and Reset Button (Top) */}
           <div className="mb-6">
 
-            <div className="border rounded-md p-2 bg-gray-50 max-w-3xl mx-auto aspect-video" style={{ aspectRatio: `${svgPreviewViewBoxWidth}/${svgPreviewViewBoxHeight}` }}>
+            <div 
+              className="border border-gray-400 rounded-md p-2 bg-gray-100 dark:bg-gray-800 dark:border-gray-600 max-w-3xl mx-auto aspect-video cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+              style={{ aspectRatio: `${svgPreviewViewBoxWidth}/${svgPreviewViewBoxHeight}` }}
+              onClick={() => setIsFullscreenPreview(true)}
+              title="Click to view fullscreen"
+            >
                 <svg ref={svgRef} viewBox={`0 0 ${svgPreviewViewBoxWidth} ${svgPreviewViewBoxHeight}`} className="w-full h-full">
-                <rect x="0" y="0" width={svgPreviewViewBoxWidth} height={svgPreviewViewBoxHeight} fill="#f0f0f0" />
-                {renderFramelines()}
-                {renderCenterMarker()}
-                {renderSiemensStars()}
-                {renderCustomLogo()}
-                {renderTextElement('title')}
-                {renderTextElement('director')}
-                {renderTextElement('dp')}
-                {renderTextElement('text1')}
-                {renderTextElement('text2')}
+                  {renderFrameLeaderContent()}
                 </svg>
             </div>
           </div>
@@ -670,7 +831,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
           {/* Section 2: Controls Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Left Column: Text Element Controls */}
-            <div className="md:col-span-2 space-y-3 pr-4 md:border-r border-gray-200">
+            <div className="md:col-span-2 space-y-4 pr-4 md:border-r border-gray-400 dark:border-gray-600">
               {( ['title', 'director', 'dp', 'text1', 'text2'] as const).map((key) => {
                 const currentSettings = settings[key];
                 let labelText = key.charAt(0).toUpperCase() + key.slice(1);
@@ -686,45 +847,113 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                   labelText = 'Custom Text 2';
                   placeholderText = 'Custom Text 2';
                 } else if (key === 'title') {
+                  labelText = 'Production';
                   placeholderText = 'Production Title';
                 } else if (key === 'director') {
                   placeholderText = 'Director Name';
                 }
                 
                 return (
-                  <div key={key} className="space-y-2 pb-3 mb-3 border-b border-gray-100 last:border-b-0 last:pb-0 last:mb-0">
-                    <h4 className="text-md font-semibold text-gray-800 text-left">{labelText}</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 items-end">
+                  <div key={key} className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 space-y-2 bg-gray-50 dark:bg-gray-800">
+                    <div className="flex items-center justify-between">
+                                              <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 text-left">{labelText}</h4>
+                                              <label htmlFor={`fl-${key}-visible`} className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          id={`fl-${key}-visible`} 
+                          checked={currentSettings.visible} 
+                          onChange={e => handleTextElementChange(key, 'visible', e.target.checked)} 
+                          className="mr-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Show
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-x-3 items-end">
                       <div className="sm:col-span-2">
-                        <label htmlFor={`fl-${key}-text`} className="block text-sm font-medium text-gray-700 text-left">Text</label>
-                        <input type="text" id={`fl-${key}-text`} value={currentSettings.text} onChange={e => handleTextElementChange(key, 'text', e.target.value)} className="mt-1 w-full fdl-input" placeholder={placeholderText}/>
+                        <input type="text" id={`fl-${key}-text`} value={currentSettings.text} onChange={e => handleTextElementChange(key, 'text', e.target.value)} className="w-full fdl-input" placeholder={placeholderText}/>
                       </div>
-                      <div className="sm:col-span-1">
-                        <label htmlFor={`fl-${key}-fontsize`} className="block text-sm font-medium text-gray-700 text-left">Size</label>
-                        <input type="number" id={`fl-${key}-fontsize`} value={currentSettings.fontSize} onChange={e => handleTextElementChange(key, 'fontSize', Number(e.target.value))} className="mt-1 w-full fdl-input-sm text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+                      <div className="sm:col-span-2">
+                        <label htmlFor={`fl-${key}-fontsize`} className="block text-xs font-medium text-gray-600 dark:text-gray-400">Size: {currentSettings.fontSize}px</label>
+                        <input 
+                          type="range" 
+                          min="8" 
+                          max="48" 
+                          step="1" 
+                          id={`fl-${key}-fontsize`} 
+                          value={currentSettings.fontSize} 
+                          onChange={e => handleTextElementChange(key, 'fontSize', Number(e.target.value))} 
+                          className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        />
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-x-2 items-center sm:col-span-7 mt-1">
                         <div className="sm:col-span-2">
-                            <label htmlFor={`fl-${key}-posx`} className="block text-xs font-medium text-gray-600 whitespace-nowrap">X: {currentSettings.position.x}</label>
+                            <label htmlFor={`fl-${key}-posx`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">X: {currentSettings.position.x}</label>
                             <input type="range" min="0" max={svgPreviewViewBoxWidth} step="1" id={`fl-${key}-posx`} value={currentSettings.position.x} onChange={e => handleTextElementChange(key, 'position', { ...currentSettings.position, x: Number(e.target.value) })} className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
                         </div>
                         <div className="sm:col-span-2">
-                            <label htmlFor={`fl-${key}-posy`} className="block text-xs font-medium text-gray-600 whitespace-nowrap">Y: {currentSettings.position.y}</label>
+                            <label htmlFor={`fl-${key}-posy`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Y: {currentSettings.position.y}</label>
                             <input type="range" min="0" max={svgPreviewViewBoxHeight} step="1" id={`fl-${key}-posy`} value={currentSettings.position.y} onChange={e => handleTextElementChange(key, 'position', { ...currentSettings.position, y: Number(e.target.value) })} className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" />
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-7 gap-x-4 items-center pt-2 mt-1">
-                        <div className="sm:col-span-3">
-                            <label htmlFor={`fl-${key}-fontfamily`} className="block text-sm font-medium text-gray-700 mb-1">Font Family</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 items-start pt-2 mt-1">
+                        <div>
+                                                         <label htmlFor={`fl-${key}-fontfamily`} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Font Family</label>
                             <select id={`fl-${key}-fontfamily`} value={currentSettings.fontFamily} onChange={e => handleTextElementChange(key, 'fontFamily', e.target.value)} className="w-full fdl-input text-sm py-1.5">
                                 {allAvailableFonts.map(font => (<option key={font.family} value={font.family}>{font.name}</option>))}
                             </select>
                         </div>
-                        <div className="sm:col-span-4 flex space-x-3 items-center pt-5">
-                            <label htmlFor={`fl-${key}-bold`} className="flex items-center text-sm text-gray-700 cursor-pointer"><input type="checkbox" id={`fl-${key}-bold`} checked={currentSettings.bold} onChange={e => handleTextElementChange(key, 'bold', e.target.checked)} className="mr-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>Bold</label>
-                            <label htmlFor={`fl-${key}-italic`} className="flex items-center text-sm text-gray-700 cursor-pointer"><input type="checkbox" id={`fl-${key}-italic`} checked={currentSettings.italic} onChange={e => handleTextElementChange(key, 'italic', e.target.checked)} className="mr-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>Italic</label>
-                            <label htmlFor={`fl-${key}-underline`} className="flex items-center text-sm text-gray-700 cursor-pointer"><input type="checkbox" id={`fl-${key}-underline`} checked={currentSettings.underline} onChange={e => handleTextElementChange(key, 'underline', e.target.checked)} className="mr-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"/>Underline</label>
+                        <div className="relative">
+                                                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Text Style</label>
+                            <button
+                              type="button"
+                              onClick={() => setOpenFormattingDropdown(openFormattingDropdown === `${key}` ? null : `${key}`)}
+                              className="w-full fdl-input text-sm py-1.5 text-left flex items-center justify-between"
+                            >
+                              <span>
+                                {[
+                                  currentSettings.bold && 'Bold',
+                                  currentSettings.italic && 'Italic', 
+                                  currentSettings.underline && 'Underline'
+                                ].filter(Boolean).join(', ') || 'Normal'}
+                              </span>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {openFormattingDropdown === `${key}` && (
+                              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                                <div className="py-1">
+                                  <label className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={currentSettings.bold} 
+                                      onChange={e => handleTextElementChange(key, 'bold', e.target.checked)} 
+                                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm font-bold">Bold</span>
+                                  </label>
+                                  <label className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={currentSettings.italic} 
+                                      onChange={e => handleTextElementChange(key, 'italic', e.target.checked)} 
+                                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm italic">Italic</span>
+                                  </label>
+                                  <label className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={currentSettings.underline} 
+                                      onChange={e => handleTextElementChange(key, 'underline', e.target.checked)} 
+                                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm underline">Underline</span>
+                                  </label>
+                                </div>
+                              </div>
+                            )}
                         </div>
                     </div>
                   </div>
@@ -735,8 +964,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             {/* Right Column: Other Controls in new order */}
             <div className="md:col-span-1 space-y-4 md:pl-4">
               {/* Framing Intents Visibility */}
-              <div>
-                <h4 className="text-md font-medium text-gray-700 mb-2">Framing Intents Display</h4>
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Framing Intents Display</h4>
                 {validIntents.length > 0 ? (
                   validIntents.map((intent, idx) => (
                     <div key={intent.id} className="flex items-center mb-1">
@@ -760,8 +989,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
               </div>
               
               {/* Anamorphic Desqueeze Toggle */}
-              <div className="flex items-center justify-between pt-2">
-                <label htmlFor="fl-anamorphic-desqueeze" className="text-sm font-medium text-gray-700">
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+                <label htmlFor="fl-anamorphic-desqueeze" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Desqueeze Anamorphic in Preview
                 </label>
                 <input
@@ -774,9 +1003,9 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
               </div>
 
               {/* Center Marker Controls */}
-              <div className="pt-2">
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
                 <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="fl-center-marker" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="fl-center-marker" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Center Marker
                   </label>
                   <input
@@ -789,22 +1018,25 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                 </div>
                 {settings.centerMarkerEnabled && (
                   <div className="ml-2">
-                    <label htmlFor="fl-center-marker-size" className="block text-xs font-medium text-gray-600">Size (px)</label>
+                    <label htmlFor="fl-center-marker-size" className="block text-xs font-medium text-gray-600 dark:text-gray-400">Size: {settings.centerMarkerSize}px</label>
                     <input
-                      type="number"
+                      type="range"
+                      min="2"
+                      max="100"
+                      step="1"
                       id="fl-center-marker-size"
                       value={settings.centerMarkerSize}
                       onChange={e => handleGenericSettingChange('centerMarkerSize', Number(e.target.value))}
-                      className="mt-1 w-full fdl-input-sm"
+                      className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
                   </div>
                 )}
               </div>
 
               {/* Siemens Stars Controls */}
-              <div className="pt-2">
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
                 <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="fl-siemens-stars" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="fl-siemens-stars" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Siemens Stars
                   </label>
                   <input
@@ -817,21 +1049,114 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                 </div>
                 {settings.siemensStarsEnabled && (
                   <div className="ml-2">
-                    <label htmlFor="fl-siemens-stars-size" className="block text-xs font-medium text-gray-600">Size (px)</label>
+                    <label htmlFor="fl-siemens-stars-size" className="block text-xs font-medium text-gray-600 dark:text-gray-400">Size: {settings.siemensStarsSize}px</label>
                     <input
-                      type="number"
+                      type="range"
+                      min="10"
+                      max="2000"
+                      step="10"
                       id="fl-siemens-stars-size"
                       value={settings.siemensStarsSize}
                       onChange={e => handleGenericSettingChange('siemensStarsSize', Number(e.target.value))}
-                      className="mt-1 w-full fdl-input-sm"
+                      className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
+                  </div>
+                )}
+              </div>
+
+              {/* Camera Information Controls */}
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor="fl-camera-info" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Camera Information
+                  </label>
+                  <input
+                    type="checkbox"
+                    id="fl-camera-info"
+                    checked={settings?.showCameraInfo || false}
+                    onChange={e => handleGenericSettingChange('showCameraInfo', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </div>
+                {settings?.showCameraInfo && (
+                  <div className="ml-2 space-y-2">
+                    <div className="space-y-1">
+                      <label className="flex items-center text-xs text-gray-700 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={settings?.showPixelDimensions || false} 
+                          onChange={e => handleGenericSettingChange('showPixelDimensions', e.target.checked)} 
+                          className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Show Pixel Dimensions
+                      </label>
+                      <label className="flex items-center text-xs text-gray-700 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={settings?.showSensorDimensions || false} 
+                          onChange={e => handleGenericSettingChange('showSensorDimensions', e.target.checked)} 
+                          className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Show Sensor Dimensions
+                      </label>
+                      <label className="flex items-center text-xs text-gray-700 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={settings?.showFormatArrow || false} 
+                          onChange={e => handleGenericSettingChange('showFormatArrow', e.target.checked)} 
+                          className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Show Format Arrow
+                      </label>
+                    </div>
+                    <div>
+                                              <label htmlFor="fl-camera-info-size" className="block text-xs font-medium text-gray-600 dark:text-gray-400">Font Size: {settings?.cameraInfoFontSize || 12}px</label>
+                        <input
+                          type="range"
+                          min="8"
+                          max="20"
+                          step="1"
+                          id="fl-camera-info-size"
+                          value={settings?.cameraInfoFontSize || 12}
+                          onChange={e => handleGenericSettingChange('cameraInfoFontSize', Number(e.target.value))}
+                        className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <div>
+                        <label htmlFor="fl-camera-info-posx" className="block text-xs font-medium text-gray-600">X: {settings?.cameraInfoPosition?.x || 400}</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max={svgPreviewViewBoxWidth} 
+                          step="1" 
+                          id="fl-camera-info-posx" 
+                          value={settings?.cameraInfoPosition?.x || 400} 
+                          onChange={e => handleGenericSettingChange('cameraInfoPosition', { ...(settings?.cameraInfoPosition || {x:400,y:120}), x: Number(e.target.value)})} 
+                          className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="fl-camera-info-posy" className="block text-xs font-medium text-gray-600">Y: {settings?.cameraInfoPosition?.y || 120}</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max={svgPreviewViewBoxHeight} 
+                          step="1" 
+                          id="fl-camera-info-posy" 
+                          value={settings?.cameraInfoPosition?.y || 120} 
+                          onChange={e => handleGenericSettingChange('cameraInfoPosition', { ...(settings?.cameraInfoPosition || {x:400,y:120}), y: Number(e.target.value)})} 
+                          className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
               
               {/* Custom Logo Section */}
-              <div className="pt-3 border-t mt-3">
-                <h4 className="text-md font-medium text-gray-700 mb-2">Custom Logo/Image</h4>
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Logo/Image</h4>
                 <div className="flex items-center justify-between mb-2">
                   <label htmlFor="fl-custom-logo-enabled" className="text-sm font-medium text-gray-700">
                     Show Custom Logo
@@ -861,14 +1186,16 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                 {settings.customLogoEnabled && settings.customLogoUrl && (
                   <>
                     <div className="mb-2">
-                      <label htmlFor="fl-custom-logo-size" className="block text-xs font-medium text-gray-600">Size (% of Preview Height)</label>
+                      <label htmlFor="fl-custom-logo-size" className="block text-xs font-medium text-gray-600">Size: {settings.customLogoSize || 15}% of Preview Height</label>
                       <input
-                        type="number"
+                        type="range"
+                        min="1"
+                        max="150"
+                        step="1"
                         id="fl-custom-logo-size"
                         value={settings.customLogoSize || 15}
                         onChange={e => handleGenericSettingChange('customLogoSize', Number(e.target.value))}
-                        className="mt-1 w-full fdl-input-sm"
-                        min="1" max="100"
+                        className="mt-1 w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -898,8 +1225,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
               </div>
 
               {/* Custom Font Upload Section */}
-              <div className="pt-3 border-t mt-3">
-                <h4 className="text-md font-medium text-gray-700 mb-2">Upload Custom Font</h4>
+              <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Upload Custom Font</h4>
                 <div className="mb-2">
                   <label htmlFor="fl-custom-font-upload" className="block text-xs font-medium text-gray-600">Upload Font File (.ttf, .otf, .woff, .woff2)</label>
                   <input 
@@ -921,8 +1248,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
               </div>
 
               {/* Export Controls Section */}
-              <div className="mt-6 pt-4 border-t">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">Export Frame Leader</h3>
+              <div className="border-2 border-gray-500 dark:border-gray-500 rounded-lg p-4 bg-gray-100 dark:bg-gray-700">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">Export Frame Leader</h3>
                 <div className="mb-3">
                   <label htmlFor="export-filename" className="block text-sm font-medium text-gray-700 mb-1">Filename</label>
                   <input 
@@ -959,6 +1286,46 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             </div>
           </div>
         </>
+      )}
+
+      {/* Fullscreen Preview Modal */}
+      {isFullscreenPreview && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-95 dark:bg-black dark:bg-opacity-98 z-50 flex items-center justify-center"
+          onClick={() => setIsFullscreenPreview(false)}
+        >
+          <div className="relative max-w-[95vw] max-h-[95vh] w-full h-full flex items-center justify-center">
+            {/* Close button */}
+            <button
+              onClick={() => setIsFullscreenPreview(false)}
+              className="absolute top-4 right-4 z-10 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-full p-3 transition-all duration-200 backdrop-blur-sm"
+              title="Close (Esc)"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            {/* Instructions */}
+            <div className="absolute top-4 left-4 z-10 bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg backdrop-blur-sm">
+              <p className="text-sm">Click anywhere or press ESC to close</p>
+            </div>
+            
+            {/* Fullscreen SVG */}
+            <div 
+              className="w-full h-full flex items-center justify-center p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <svg 
+                viewBox={`0 0 ${svgPreviewViewBoxWidth} ${svgPreviewViewBoxHeight}`} 
+                className="max-w-full max-h-full border border-gray-400 dark:border-gray-500 bg-white dark:bg-gray-900 shadow-2xl"
+                style={{ aspectRatio: `${svgPreviewViewBoxWidth}/${svgPreviewViewBoxHeight}` }}
+              >
+                {renderFrameLeaderContent()}
+              </svg>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

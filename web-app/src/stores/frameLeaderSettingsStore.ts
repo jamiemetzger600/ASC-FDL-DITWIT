@@ -10,6 +10,7 @@ export interface TextElementSettings {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  visible: boolean; // New: visibility toggle for each text element
 }
 
 export interface CustomFont {
@@ -46,6 +47,13 @@ export interface FrameLeaderSettings {
   customLogoUrl?: string | null;
   customLogoSize?: number;
   customLogoPosition?: { x: number; y: number };
+  // Camera information display options
+  showCameraInfo: boolean;
+  showPixelDimensions: boolean;
+  showSensorDimensions: boolean;
+  showFormatArrow: boolean;
+  cameraInfoPosition: { x: number; y: number };
+  cameraInfoFontSize: number;
   // New persistent custom assets
   customFonts: CustomFont[];
   customImages: CustomImage[];
@@ -105,6 +113,45 @@ export const useFrameLeaderSettingsStore = create<FrameLeaderSettingsState>()(
       storage: createJSONStorage(() => localStorage),
       // Only persist the settings object
       partialize: (state) => ({ settings: state.settings }),
+      // Add migration for new camera info properties
+      onRehydrateStorage: () => (state) => {
+        if (state?.settings) {
+          // Ensure new camera info properties exist with defaults
+          const defaults = {
+            showCameraInfo: true,
+            showPixelDimensions: true,
+            showSensorDimensions: true,
+            showFormatArrow: true,
+            cameraInfoPosition: { x: 400, y: 120 },
+            cameraInfoFontSize: 12,
+            visible: true // for text elements
+          };
+          
+          // Migrate text elements to include visible property
+          if (state.settings.title && state.settings.title.visible === undefined) {
+            state.settings.title.visible = true;
+          }
+          if (state.settings.director && state.settings.director.visible === undefined) {
+            state.settings.director.visible = true;
+          }
+          if (state.settings.dp && state.settings.dp.visible === undefined) {
+            state.settings.dp.visible = true;
+          }
+          if (state.settings.text1 && state.settings.text1.visible === undefined) {
+            state.settings.text1.visible = false;
+          }
+          if (state.settings.text2 && state.settings.text2.visible === undefined) {
+            state.settings.text2.visible = false;
+          }
+          
+          // Add missing camera info properties
+          Object.keys(defaults).forEach(key => {
+            if (key !== 'visible' && !(key in state.settings)) {
+              (state.settings as any)[key] = (defaults as any)[key];
+            }
+          });
+        }
+      },
     }
   )
 ); 
