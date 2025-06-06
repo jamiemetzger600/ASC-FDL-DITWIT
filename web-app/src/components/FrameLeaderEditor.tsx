@@ -134,6 +134,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   }, [settings?.customFonts]);
 
   const [isFrameLeaderSettingsVisible, setIsFrameLeaderSettingsVisible] = useState(false);
+  const [showFloatingControls, setShowFloatingControls] = useState(false);
   
   // Initialize exportFilename based on the default title text
   const [exportFilename, setExportFilename] = useState<string>(
@@ -813,8 +814,20 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
 
       {isFrameLeaderSettingsVisible && (
         <>
-          {/* Section 1: Live Preview and Reset Button (Top) */}
+          {/* Section 1: Live Preview and Floating Controls Button */}
           <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Frame Leader Preview</h3>
+              <button
+                onClick={() => setShowFloatingControls(!showFloatingControls)}
+                className="fdl-button-secondary text-sm flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                </svg>
+                {showFloatingControls ? 'Hide Controls' : 'Floating Controls'}
+              </button>
+            </div>
 
             <div 
               className="border border-gray-400 rounded-md p-2 bg-gray-100 dark:bg-gray-800 dark:border-gray-600 max-w-3xl mx-auto aspect-video cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
@@ -1286,6 +1299,159 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             </div>
           </div>
         </>
+      )}
+
+      {/* Floating Controls Panel */}
+      {showFloatingControls && isFrameLeaderSettingsVisible && (
+        <div className="fixed top-20 right-6 bg-white dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-600 rounded-lg shadow-2xl z-40 w-80 max-h-[80vh] overflow-y-auto">
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4 border-b border-gray-300 dark:border-gray-600 pb-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Controls</h3>
+              <button
+                onClick={() => setShowFloatingControls(false)}
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Logo Size Control */}
+              {settings.customLogoEnabled && settings.customLogoUrl && (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Logo Size</h4>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.customLogoSize || 15}%</label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="150"
+                      step="1"
+                      value={settings.customLogoSize || 15}
+                      onChange={e => handleGenericSettingChange('customLogoSize', Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Text Size Controls */}
+              {(['title', 'director', 'dp', 'text1', 'text2'] as const).map((key) => {
+                const currentSettings = settings[key];
+                if (!currentSettings.visible) return null;
+                
+                let labelText = key.charAt(0).toUpperCase() + key.slice(1);
+                if (key === 'dp') labelText = 'DP';
+                else if (key === 'text1') labelText = 'Custom Text 1';
+                else if (key === 'text2') labelText = 'Custom Text 2';
+                else if (key === 'title') labelText = 'Production';
+                
+                return (
+                  <div key={key} className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{labelText} Size</h4>
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {currentSettings.fontSize}px</label>
+                      <input 
+                        type="range" 
+                        min="8" 
+                        max="48" 
+                        step="1" 
+                        value={currentSettings.fontSize} 
+                        onChange={e => handleTextElementChange(key, 'fontSize', Number(e.target.value))} 
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Siemens Stars Size Control */}
+              {settings.siemensStarsEnabled && (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Siemens Stars Size</h4>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.siemensStarsSize || 200}px</label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="2000"
+                      step="10"
+                      value={settings.siemensStarsSize || 200}
+                      onChange={e => handleGenericSettingChange('siemensStarsSize', Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Center Marker Size Control */}
+              {settings.centerMarkerEnabled && (
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Center Marker Size</h4>
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.centerMarkerSize || 20}px</label>
+                    <input
+                      type="range"
+                      min="2"
+                      max="100"
+                      step="1"
+                      value={settings.centerMarkerSize || 20}
+                      onChange={e => handleGenericSettingChange('centerMarkerSize', Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Toggle Controls */}
+              <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Toggles</h4>
+                <div className="space-y-2">
+                  {settings.customLogoUrl && (
+                    <label className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.customLogoEnabled || false} 
+                        onChange={e => handleGenericSettingChange('customLogoEnabled', e.target.checked)} 
+                        className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      Show Logo
+                    </label>
+                  )}
+                  <label className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.siemensStarsEnabled || false} 
+                      onChange={e => handleGenericSettingChange('siemensStarsEnabled', e.target.checked)} 
+                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    Show Siemens Stars
+                  </label>
+                  <label className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.centerMarkerEnabled || false} 
+                      onChange={e => handleGenericSettingChange('centerMarkerEnabled', e.target.checked)} 
+                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    Show Center Marker
+                  </label>
+                </div>
+              </div>
+
+              <div className="text-center pt-2">
+                <button
+                  onClick={() => setShowFloatingControls(false)}
+                  className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                >
+                  Close panel to access full settings below
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Fullscreen Preview Modal */}
