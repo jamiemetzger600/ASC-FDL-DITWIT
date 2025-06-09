@@ -38,6 +38,7 @@ export interface FrameLeaderSettings {
   text1: TextElementSettings;
   text2: TextElementSettings;
   intentVisibility: { [intentId: string]: boolean };
+  intentArrowVisibility: { [intentId: string]: boolean };
   centerMarkerEnabled: boolean;
   centerMarkerSize: number;
   siemensStarsEnabled: boolean;
@@ -52,6 +53,7 @@ export interface FrameLeaderSettings {
   showPixelDimensions: boolean;
   showSensorDimensions: boolean;
   showFormatArrow: boolean;
+  showFramingArrows: boolean;
   cameraInfoPosition: { x: number; y: number };
   cameraInfoFontSize: number;
   // New persistent custom assets
@@ -122,8 +124,10 @@ export const useFrameLeaderSettingsStore = create<FrameLeaderSettingsState>()(
             showPixelDimensions: true,
             showSensorDimensions: true,
             showFormatArrow: true,
+            showFramingArrows: false,
             cameraInfoPosition: { x: 400, y: 120 },
             cameraInfoFontSize: 12,
+            intentArrowVisibility: {},
             visible: true // for text elements
           };
           
@@ -150,6 +154,14 @@ export const useFrameLeaderSettingsStore = create<FrameLeaderSettingsState>()(
               (state.settings as any)[key] = (defaults as any)[key];
             }
           });
+          
+          // Ensure arrow visibility properties exist
+          if (!state.settings.intentArrowVisibility) {
+            state.settings.intentArrowVisibility = {};
+          }
+          if (state.settings.showFramingArrows === undefined) {
+            state.settings.showFramingArrows = false;
+          }
         }
       },
     }
