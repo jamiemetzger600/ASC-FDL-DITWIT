@@ -7,6 +7,12 @@ This document outlines planned features, improvements, and to-do items for the A
 - [ ] **FDL Version Tracking:** Ensure that the application version is included in the FDL file under the `"version":` section. This will help users track issues related to specific app versions.
 - [ ] **Intuitive Framing Intent Creation:** Redesign the UI/UX for creating Framing Intents to be highly intuitive and user-friendly. Technical information should be hidden by default and revealed upon user request (e.g., via a checkbox or dropdown), allowing users to focus on creating their FDL without technical distractions.
 - [ ] **FDL Creator Information:** Automatically populate the `"fdl_creator"` field in the FDL with: `"ASC-DIT-FDL" Jamie Metzger [415]515]2841 - Jamiemetzger@gmail.com`.
+- [ ] **Expose Core FDL Metadata Fields in UI:** Add user-editable fields for important ASC FDL specification metadata that are currently hidden:
+  - [ ] **FDL Creator Field:** Add UI input for users to set the `fdl_creator` field (who created this FDL)
+  - [ ] **Context Creator Field:** Add UI input for users to set the `context_creator` field per context (who created this camera setup/context)
+  - [ ] **Default Framing Intent:** Add UI dropdown to let users select which framing intent should be the `default_framing_intent`
+  - [ ] **Context Labels:** Add UI input for users to set meaningful `label` names for each context instead of generic "Camera Setup X"
+  - [ ] **FDL Creator Auto-population:** Provide option to auto-populate creator fields with "ASC-DIT-FDL" + user info, but allow full customization
 - [ ] **Sample Images & User Uploads:** Incorporate sample images for framing reference, similar to the Arri Frameline Composer. Additionally, provide an option for users to upload their own custom images.
 - [ ] **Re-enable Right-Hand Panels:** Uncomment and restore the "Validation Status", "FDL Summary", and "Quick Actions" panels in the UI when appropriate.
 - [ ] **Re-enable Setup Label & Context Creator:** Uncomment and restore the "Setup Label" and "Context Creator" input fields in the Camera Setup section when appropriate.
