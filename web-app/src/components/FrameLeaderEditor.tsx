@@ -88,10 +88,11 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     text1: { text: '', fontSize: 12, position: { x: 400, y: svgPreviewViewBoxHeight - 40 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: false },
     text2: { text: '', fontSize: 12, position: { x: 400, y: svgPreviewViewBoxHeight - 25 }, fontFamily: PREDEFINED_FONTS[0].family, bold: false, italic: false, underline: false, visible: false },
     intentVisibility: createInitialIntentVisibility(),
+    intentArrowVisibility: {},
     centerMarkerEnabled: true,
     centerMarkerSize: 28,
     siemensStarsEnabled: true,
-    siemensStarsSize: 35,
+    siemensStarsSize: 1000,
     anamorphicDesqueezeInPreview: false,
         customLogoEnabled: false,
     customLogoUrl: null,
@@ -101,6 +102,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     showPixelDimensions: true,
     showSensorDimensions: true,
     showFormatArrow: true,
+    showFramingArrows: false,
     cameraInfoPosition: { x: 400, y: 120 },
     cameraInfoFontSize: 12,
     customFonts: [],
@@ -540,8 +542,16 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     const dimensions = canvas.dimensions;
     if (!dimensions) return null;
 
+    // Filter intents to only those that are valid AND visible
+    const visibleValidIntents = (fdl.framing_intents || [])
+      .filter(intent => 
+        intent.aspect_ratio && 
+        intent.aspect_ratio.width > 0 && 
+        intent.aspect_ratio.height > 0 &&
+        settings.intentVisibility[intent.id]
+      );
+
     const cameraName = canvas.label || canvas.source_canvas_id || 'Camera';
-    const sensorFormat = '';
     const width = dimensions.width;
     const height = dimensions.height;
     
@@ -555,84 +565,398 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     const sensorWidthMm = formatNumberForDisplay(physicalDimensions.width);
     const sensorHeightMm = formatNumberForDisplay(physicalDimensions.height);
     
+    // Determine capture resolution designation (e.g., "8.6K", "4K", etc.)
+    const megapixels = (photositeDimensions.width * photositeDimensions.height) / 1000000;
+    let captureResolution = '';
+    if (photositeDimensions.width >= 7680) {
+      captureResolution = '8K+';
+    } else if (photositeDimensions.width >= 5760) {
+      captureResolution = '6K+';
+    } else if (photositeDimensions.width >= 3840) {
+      captureResolution = '4K+';
+    } else if (photositeDimensions.width >= 1920) {
+      captureResolution = '2K+';
+    } else {
+      captureResolution = 'HD';
+    }
+    
+    // More precise labeling based on sensor dimensions
+    if (photositeDimensions.width === 8640) captureResolution = '8.6K';
+    else if (photositeDimensions.width === 8192) captureResolution = '8K';
+    else if (photositeDimensions.width === 6048) captureResolution = '6K';
+    else if (photositeDimensions.width === 4096) captureResolution = '4K';
+    else if (photositeDimensions.width === 3840) captureResolution = '4K UHD';
+    else if (photositeDimensions.width === 1920) captureResolution = '2K/HD';
+    
     const baseY = settings.cameraInfoPosition?.y || 120;
     const fontSize = settings.cameraInfoFontSize || 12;
     const lineHeight = fontSize * 1.4;
     
     let yOffset = 0;
     const elements = [];
+    const compactFontSize = fontSize - 1;
+    const labelFontSize = fontSize - 3;
+    const compactLineHeight = fontSize * 1.1;
     
-    // Camera name and format
+    // Calculate box dimensions dynamically based on actual content
+    const calculateBoxDimensions = () => {
+      const padding = 10; // Consistent padding around content
+      const columnGap = 10; // Gap between left and right columns
+      
+      // Calculate content for measurements
+      const sourceLines = [
+        `Source: ${captureResolution} 17:9 Full Frame`,
+        ...(settings.showPixelDimensions ? [`Canvas: ${photositeDimensions.width} x ${photositeDimensions.height} px`] : []),
+        ...(settings.showSensorDimensions ? [`Sensor: ${sensorWidthMm} x ${sensorHeightMm} mm`] : [])
+      ];
+      
+      const intentLines: string[] = [];
+      if (settings.showFormatArrow && visibleValidIntents.length > 0) {
+        visibleValidIntents.forEach((intent, index) => {
+          if (intent.aspect_ratio) {
+            const frameDimensions = calculateExactFrameDimensions(
+              photositeDimensions.width,
+              photositeDimensions.height,
+              intent.aspect_ratio.width,
+              intent.aspect_ratio.height,
+              DEFAULT_ROUNDING
+            );
+            const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
+            const cropPhysicalWidth = formatNumberForDisplay(frameDimensions.width * pixelPitch);
+            const cropPhysicalHeight = formatNumberForDisplay(frameDimensions.height * pixelPitch);
+            const colorNames = ["Red", "Blue", "Yellow", "Green", "Purple", "Pink"];
+            const colorName = colorNames[index % colorNames.length];
+            
+            intentLines.push(
+              `Intent: ${formatNumberForDisplay(preciseAspectRatio)}:1 ${colorName} Box`,
+              `Resolution: ${frameDimensions.width} x ${frameDimensions.height} px`,
+              `Dimensions: ${cropPhysicalWidth} x ${cropPhysicalHeight} mm`
+            );
+          }
+        });
+      }
+      
+      // Calculate approximate text width (rough estimation)
+      const avgCharWidth = compactFontSize * 0.6; // Approximate character width
+      const leftColumnWidth = Math.max(...intentLines.map(line => line.length)) * avgCharWidth;
+      const rightColumnWidth = Math.max(...sourceLines.map(line => line.length)) * avgCharWidth;
+      
+      // Calculate total width
+      const totalWidth = Math.max(
+        leftColumnWidth + rightColumnWidth + columnGap + (padding * 2),
+        280 // Minimum width
+      );
+      
+      // Calculate total height
+      const maxLines = Math.max(sourceLines.length, intentLines.length);
+      const totalHeight = (maxLines * compactLineHeight) + (padding * 2) + (maxLines > 3 ? compactLineHeight : 0); // Extra space for longer content
+      
+      return {
+        width: Math.ceil(totalWidth),
+        height: Math.ceil(totalHeight)
+      };
+    };
+    
+    const boxDimensions = calculateBoxDimensions();
+    const infoWidth = boxDimensions.width;
+    const infoHeight = boxDimensions.height;
+    const centerX = settings.cameraInfoPosition?.x || 400;
+    const boxLeft = centerX - infoWidth/2;
+    const leftColumnX = boxLeft + 10; // 10px padding from left edge
+    const rightColumnX = boxLeft + infoWidth/2 + 5; // Right column starts at middle + 5px
+    
+    // Semi-transparent background for camera info
     elements.push(
-      <text key="camera-name" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
-            fontSize={fontSize + 2} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
-        {`${cameraName}${sensorFormat ? ` | ${sensorFormat}` : ''}`}
+      <rect key="camera-info-bg" 
+            x={boxLeft} 
+            y={baseY - 5} 
+            width={infoWidth} 
+            height={infoHeight}
+            fill="white" 
+            fillOpacity="0.8" 
+            stroke="lightgray" 
+            strokeWidth="0.5"
+            rx="3" />
+    );
+    
+    // Right column - Source information
+    let rightYOffset = 0;
+    elements.push(
+      <text key="source-compact" x={rightColumnX} y={baseY + rightYOffset + compactLineHeight} 
+            fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+        <tspan fill="gray" fontSize={labelFontSize}>Source: </tspan>
+        {`${captureResolution} 17:9 Full Frame`}
       </text>
     );
-    yOffset += lineHeight + 4;
+    rightYOffset += compactLineHeight + 2;
     
-    // Pixel dimensions
+    // Canvas pixel dimensions (compact)
     if (settings.showPixelDimensions) {
       elements.push(
-        <text key="pixel-dims" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
-              fontSize={fontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
-          {`${width} x ${height}`}
+        <text key="pixel-compact" x={rightColumnX} y={baseY + rightYOffset + compactLineHeight} 
+              fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+          <tspan fill="gray" fontSize={labelFontSize}>Canvas: </tspan>
+          {`${photositeDimensions.width} x ${photositeDimensions.height} px`}
         </text>
       );
-      yOffset += lineHeight;
+      rightYOffset += compactLineHeight + 2;
     }
     
-    // Sensor dimensions
+    // Physical sensor dimensions (compact)  
     if (settings.showSensorDimensions) {
       elements.push(
-        <text key="sensor-dims" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
-              fontSize={fontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
+        <text key="sensor-compact" x={rightColumnX} y={baseY + rightYOffset + compactLineHeight} 
+              fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+          <tspan fill="gray" fontSize={labelFontSize}>Sensor: </tspan>
           {`${sensorWidthMm} x ${sensorHeightMm} mm`}
         </text>
       );
-      yOffset += lineHeight + 8;
     }
     
-    // Format arrow and framing info (if framing intents exist)
-    if (settings.showFormatArrow && validIntents.length > 0) {
-      const primaryIntent = validIntents[0];
-      if (primaryIntent.aspect_ratio) {
-        // Use precise calculation method with ASC FDL rounding
-        const frameDimensions = calculateExactFrameDimensions(
-          width,
-          height,
-          primaryIntent.aspect_ratio.width,
-          primaryIntent.aspect_ratio.height,
-          DEFAULT_ROUNDING
-        );
-        
-        const cropWidth = frameDimensions.width;
-        const cropHeight = frameDimensions.height;
-        const preciseAspectRatio = calculatePreciseAspectRatio(primaryIntent.aspect_ratio.width, primaryIntent.aspect_ratio.height);
-        const cropSensorWidthMm = formatNumberForDisplay(cropWidth * pixelPitch);
-        const cropSensorHeightMm = formatNumberForDisplay(cropHeight * pixelPitch);
-        
-        // Format arrow (triangle)
-        const x = settings.cameraInfoPosition?.x || 400;
-        elements.push(
-          <polygon key="format-arrow" 
-                   points={`${x - 8},${baseY + yOffset - 2} ${x + 8},${baseY + yOffset - 2} ${x},${baseY + yOffset + 6}`}
-                   fill="black" />
-        );
-        yOffset += 12;
-        
-        // Format line with precise calculations
-        const formatText = `${formatNumberForDisplay(preciseAspectRatio)}:1 (${cropWidth} x ${cropHeight}) [${cropSensorWidthMm} x ${cropSensorHeightMm} mm]`;
-        elements.push(
-          <text key="format-line" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
-                fontSize={fontSize - 1} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">
-            {formatText}
-          </text>
-        );
-      }
+    // Left column - Framing Intent Information (compact format)
+    if (settings.showFormatArrow && visibleValidIntents.length > 0) {
+      let leftYOffset = 0;
+      visibleValidIntents.forEach((intent, index) => {
+        if (intent.aspect_ratio) {
+          // Use precise calculation method with ASC FDL rounding
+          const frameDimensions = calculateExactFrameDimensions(
+            photositeDimensions.width,
+            photositeDimensions.height,
+            intent.aspect_ratio.width,
+            intent.aspect_ratio.height,
+            DEFAULT_ROUNDING
+          );
+          
+          const cropWidth = frameDimensions.width;
+          const cropHeight = frameDimensions.height;
+          const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
+          
+          // Calculate physical dimensions for the framing intent
+          const cropPhysicalWidth = formatNumberForDisplay(cropWidth * pixelPitch);
+          const cropPhysicalHeight = formatNumberForDisplay(cropHeight * pixelPitch);
+          
+          // Get the color for this framing intent
+          const intentColor = intentColors[index % intentColors.length];
+          const colorNames = ["Red", "Blue", "Yellow", "Green", "Purple", "Pink"];
+          const colorName = colorNames[index % colorNames.length];
+          
+          // Compact Framing Intent - ratio with colored box
+          const aspectRatioText = `${formatNumberForDisplay(preciseAspectRatio)}:1`;
+          const intentLabelText = "Intent: ";
+          
+          // Calculate the width of the text before the colored box
+          const avgCharWidth = compactFontSize * 0.6; // Approximate character width
+          const labelCharWidth = labelFontSize * 0.6; // Smaller font for label
+          const intentLabelWidth = intentLabelText.length * labelCharWidth;
+          const aspectRatioWidth = aspectRatioText.length * avgCharWidth;
+          const totalTextWidth = intentLabelWidth + aspectRatioWidth;
+          
+          elements.push(
+            <text key={`framing-intent-ratio-${index}`} x={leftColumnX} y={baseY + leftYOffset + compactLineHeight} 
+                  fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+              <tspan fill="gray" fontSize={labelFontSize}>Intent: </tspan>
+              {aspectRatioText}
+            </text>
+          );
+          
+          // Add colored box after text with proper spacing
+          const boxSpacing = 8; // Space between text and box
+          const boxSize = compactFontSize - 2;
+          const boxX = leftColumnX + totalTextWidth + boxSpacing;
+          
+          elements.push(
+            <rect key={`color-box-${index}`}
+                  x={boxX} 
+                  y={baseY + leftYOffset + compactLineHeight - compactFontSize + 2}
+                  width={boxSize} 
+                  height={boxSize}
+                  fill={intentColor}
+                  stroke="black"
+                  strokeWidth="0.5"
+                  rx="1" />
+          );
+          
+          // Add color name after the box
+          const colorNameX = boxX + boxSize + 5; // 5px spacing after box
+          elements.push(
+            <text key={`color-name-${index}`} x={colorNameX} y={baseY + leftYOffset + compactLineHeight} 
+                  fontSize={labelFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="gray" textAnchor="start">
+              {`${colorName} Box`}
+            </text>
+          );
+          leftYOffset += compactLineHeight + 2;
+          
+          // Compact Framing Intent resolution
+          elements.push(
+            <text key={`framing-intent-pixels-${index}`} x={leftColumnX} y={baseY + leftYOffset + compactLineHeight} 
+                  fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+              <tspan fill="gray" fontSize={labelFontSize}>Resolution: </tspan>
+              {`${cropWidth} x ${cropHeight} px`}
+            </text>
+          );
+          leftYOffset += compactLineHeight + 2;
+          
+          // Compact Framing Intent physical dimensions
+          elements.push(
+            <text key={`framing-intent-dims-${index}`} x={leftColumnX} y={baseY + leftYOffset + compactLineHeight} 
+                  fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+              <tspan fill="gray" fontSize={labelFontSize}>Dimensions: </tspan>
+              {`${cropPhysicalWidth} x ${cropPhysicalHeight} mm`}
+            </text>
+          );
+          leftYOffset += compactLineHeight + 4;
+        }
+      });
     }
+
+
     
     return <g key="camera-info">{elements}</g>;
+  };
+
+  // Render format arrows that point inward at the framing intent boundaries
+  const renderFormatArrows = () => {
+    if (!settings?.showFramingArrows || !primaryCanvas) return null;
+    
+    const canvas = primaryCanvas;
+    const dimensions = canvas.dimensions;
+    if (!dimensions) return null;
+
+    // Filter intents to only those that are valid AND visible
+    const visibleValidIntents = (fdl.framing_intents || [])
+      .filter(intent => 
+        intent.aspect_ratio && 
+        intent.aspect_ratio.width > 0 && 
+        intent.aspect_ratio.height > 0 &&
+        settings.intentVisibility[intent.id]
+      );
+    if (visibleValidIntents.length === 0) return null;
+
+    const canvasWidthPx = dimensions.width;
+    const canvasHeightPx = dimensions.height;
+    const scaledDimensions = getScaledCanvasDimensions();
+    if (!scaledDimensions) return null;
+    
+    const overallScale = scaledDimensions.scaledCanvasWidth / canvasWidthPx;
+
+    const canvasRectX = (svgPreviewViewBoxWidth - scaledDimensions.scaledCanvasWidth) / 2;
+    const canvasRectY = (svgPreviewViewBoxHeight - scaledDimensions.scaledCanvasHeight) / 2;
+
+    const elements: React.JSX.Element[] = [];
+
+    // Render arrows for each visible framing intent
+    visibleValidIntents.forEach((intent, index) => {
+      // Check individual arrow visibility (default to true if not set)
+      const showArrowsForThisIntent = settings.intentArrowVisibility?.[intent.id] !== false;
+      if (!showArrowsForThisIntent) return;
+
+      // Calculate frame dimensions using our precise mathematical tools
+      const photositeDimensions = canvas.photosite_dimensions || { width: canvasWidthPx, height: canvasHeightPx };
+      const frameDimensions = calculateExactFrameDimensions(
+        photositeDimensions.width,
+        photositeDimensions.height,
+        intent.aspect_ratio.width,
+        intent.aspect_ratio.height,
+        DEFAULT_ROUNDING
+      );
+
+      // Apply protection if specified
+      let displayWidth = frameDimensions.width;
+      let displayHeight = frameDimensions.height;
+      
+      if (intent.protection && intent.protection > 0 && intent.protection < 100) {
+        const protectionResult = calculateFrameWithProtection(
+          frameDimensions.width,
+          frameDimensions.height,
+          intent.protection,
+          DEFAULT_ROUNDING
+        );
+        displayWidth = protectionResult.width;
+        displayHeight = protectionResult.height;
+      }
+
+      // Scale the dimensions to the preview
+      const scaledFrameWidth = displayWidth * overallScale;
+      const scaledFrameHeight = displayHeight * overallScale;
+
+      // Calculate frame position (centered on canvas)
+      const frameX = canvasRectX + (scaledDimensions.scaledCanvasWidth - scaledFrameWidth) / 2;
+      const frameY = canvasRectY + (scaledDimensions.scaledCanvasHeight - scaledFrameHeight) / 2;
+
+             // Arrow properties
+       const arrowSize = 12;
+       const arrowOffset = 8; // Distance inside from the frame edge
+       const centerOffset = scaledFrameWidth * 0.2; // Position arrows towards center of each edge to avoid Siemens stars
+
+       // Top arrows (pointing DOWN into frame) - positioned towards center to avoid Siemens stars
+       elements.push(
+         <polygon
+           key={`arrow-top-left-${intent.id}`}
+           points={`${frameX + centerOffset},${frameY + arrowOffset} ${frameX + centerOffset - arrowSize/2},${frameY + arrowOffset + arrowSize} ${frameX + centerOffset + arrowSize/2},${frameY + arrowOffset + arrowSize}`}
+           fill="black"
+         />
+       );
+       elements.push(
+         <polygon
+           key={`arrow-top-right-${intent.id}`}
+           points={`${frameX + scaledFrameWidth - centerOffset},${frameY + arrowOffset} ${frameX + scaledFrameWidth - centerOffset - arrowSize/2},${frameY + arrowOffset + arrowSize} ${frameX + scaledFrameWidth - centerOffset + arrowSize/2},${frameY + arrowOffset + arrowSize}`}
+           fill="black"
+         />
+       );
+
+       // Bottom arrows (pointing UP into frame) - positioned towards center to avoid Siemens stars
+       elements.push(
+         <polygon
+           key={`arrow-bottom-left-${intent.id}`}
+           points={`${frameX + centerOffset},${frameY + scaledFrameHeight - arrowOffset} ${frameX + centerOffset - arrowSize/2},${frameY + scaledFrameHeight - arrowOffset - arrowSize} ${frameX + centerOffset + arrowSize/2},${frameY + scaledFrameHeight - arrowOffset - arrowSize}`}
+           fill="black"
+         />
+       );
+       elements.push(
+         <polygon
+           key={`arrow-bottom-right-${intent.id}`}
+           points={`${frameX + scaledFrameWidth - centerOffset},${frameY + scaledFrameHeight - arrowOffset} ${frameX + scaledFrameWidth - centerOffset - arrowSize/2},${frameY + scaledFrameHeight - arrowOffset - arrowSize} ${frameX + scaledFrameWidth - centerOffset + arrowSize/2},${frameY + scaledFrameHeight - arrowOffset - arrowSize}`}
+           fill="black"
+         />
+       );
+
+       // Calculate vertical center offset (proportional to frame height)
+       const verticalCenterOffset = scaledFrameHeight * 0.2;
+
+       // Left arrows (pointing RIGHT into frame) - positioned towards center to avoid Siemens stars
+       elements.push(
+         <polygon
+           key={`arrow-left-top-${intent.id}`}
+           points={`${frameX + arrowOffset},${frameY + verticalCenterOffset} ${frameX + arrowOffset + arrowSize},${frameY + verticalCenterOffset - arrowSize/2} ${frameX + arrowOffset + arrowSize},${frameY + verticalCenterOffset + arrowSize/2}`}
+           fill="black"
+         />
+       );
+       elements.push(
+         <polygon
+           key={`arrow-left-bottom-${intent.id}`}
+           points={`${frameX + arrowOffset},${frameY + scaledFrameHeight - verticalCenterOffset} ${frameX + arrowOffset + arrowSize},${frameY + scaledFrameHeight - verticalCenterOffset - arrowSize/2} ${frameX + arrowOffset + arrowSize},${frameY + scaledFrameHeight - verticalCenterOffset + arrowSize/2}`}
+           fill="black"
+         />
+       );
+
+       // Right arrows (pointing LEFT into frame) - positioned towards center to avoid Siemens stars
+       elements.push(
+         <polygon
+           key={`arrow-right-top-${intent.id}`}
+           points={`${frameX + scaledFrameWidth - arrowOffset},${frameY + verticalCenterOffset} ${frameX + scaledFrameWidth - arrowOffset - arrowSize},${frameY + verticalCenterOffset - arrowSize/2} ${frameX + scaledFrameWidth - arrowOffset - arrowSize},${frameY + verticalCenterOffset + arrowSize/2}`}
+           fill="black"
+         />
+       );
+       elements.push(
+         <polygon
+           key={`arrow-right-bottom-${intent.id}`}
+           points={`${frameX + scaledFrameWidth - arrowOffset},${frameY + scaledFrameHeight - verticalCenterOffset} ${frameX + scaledFrameWidth - arrowOffset - arrowSize},${frameY + scaledFrameHeight - verticalCenterOffset - arrowSize/2} ${frameX + scaledFrameWidth - arrowOffset - arrowSize},${frameY + scaledFrameHeight - verticalCenterOffset + arrowSize/2}`}
+           fill="black"
+         />
+       );
+    });
+
+    return <g key="format-arrows">{elements}</g>;
   };
 
   // Helper to render all frame leader content (for reuse in preview and fullscreen)
@@ -644,6 +968,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       {renderSiemensStars()}
       {renderCustomLogo()}
       {renderCameraInfo()}
+      {renderFormatArrows()}
       {renderTextElement('title')}
       {renderTextElement('director')}
       {renderTextElement('dp')}
@@ -835,7 +1160,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       >
         <div className="flex-grow text-center">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 inline-block">
-            Frame Leader Setting
+            Frame Leader Settings
           </h2>
         </div>
         <span className="text-xl text-gray-600 dark:text-gray-400">
@@ -847,11 +1172,11 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
         <>
           {/* Section 1: Live Preview and Floating Controls Button */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Frame Leader Preview</h3>
+            <div className="relative mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 text-center">Frame Leader Preview</h3>
               <button
                 onClick={() => setShowFloatingControls(!showFloatingControls)}
-                className="fdl-button-secondary text-sm flex items-center gap-2"
+                className="absolute right-0 top-0 fdl-button-secondary text-sm flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
@@ -1022,8 +1347,18 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                         }}
                         className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor={`intent-vis-${intent.id}`} className="ml-2 block text-sm text-gray-900" style={{ color: intentColors[idx % intentColors.length] }}>
-                        {intent.label || `Intent ${idx + 1}`}
+                      <label htmlFor={`intent-vis-${intent.id}`} className="ml-2 inline-block">
+                        <span 
+                          className="inline-block px-2 py-1 rounded-md text-xs font-semibold text-white"
+                          style={{
+                            backgroundColor: (() => {
+                              const colors = ["#ef4444", "#3b82f6", "#eab308", "#10b981", "#8b5cf6", "#ec4899"]; // red, blue, yellow, green, purple, pink
+                              return colors[idx % colors.length];
+                            })()
+                          }}
+                        >
+                          {intent.label || `Intent ${idx + 1}`}
+                        </span>
                       </label>
                     </div>
                   ))
@@ -1150,8 +1485,65 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                           onChange={e => handleGenericSettingChange('showFormatArrow', e.target.checked)} 
                           className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        Show Format Arrow
+                        Show Framing Intent
                       </label>
+                      <label className="flex items-center text-xs text-gray-700 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={settings?.showFramingArrows || false} 
+                          onChange={e => handleGenericSettingChange('showFramingArrows', e.target.checked)} 
+                          className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Show Format Arrows
+                      </label>
+                      
+                      {/* Individual arrow controls when multiple intents exist */}
+                      {settings?.showFramingArrows && (() => {
+                        const validIntents = (fdl.framing_intents || []).filter(intent => 
+                          intent.aspect_ratio && 
+                          intent.aspect_ratio.width > 0 && 
+                          intent.aspect_ratio.height > 0 &&
+                          settings.intentVisibility[intent.id]
+                        );
+                        
+                        if (validIntents.length > 1) {
+                          const colorNames = ["Red", "Blue", "Yellow", "Green", "Purple", "Pink"];
+                          
+                          return (
+                            <div className="ml-4 mt-2 space-y-1">
+                              <div className="text-xs text-gray-500 mb-1">Individual Arrow Controls:</div>
+                              {validIntents.map((intent, index) => {
+                                const colorName = colorNames[index % colorNames.length];
+                                const intentColor = intentColors[index % intentColors.length];
+                                const isArrowVisible = settings.intentArrowVisibility?.[intent.id] !== false;
+                                
+                                return (
+                                  <label key={intent.id} className="flex items-center text-xs text-gray-600 cursor-pointer">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={isArrowVisible} 
+                                      onChange={e => {
+                                        const newVisibility = {
+                                          ...settings.intentArrowVisibility,
+                                          [intent.id]: e.target.checked
+                                        };
+                                        handleGenericSettingChange('intentArrowVisibility', newVisibility);
+                                      }} 
+                                      className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <div 
+                                      className="w-3 h-3 mr-1 border border-black rounded-sm" 
+                                      style={{ backgroundColor: intentColor }}
+                                    ></div>
+                                    {colorName} Box Arrows
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <div>
                                               <label htmlFor="fl-camera-info-size" className="block text-xs font-medium text-gray-600 dark:text-gray-400">Font Size: {settings?.cameraInfoFontSize || 12}px</label>
