@@ -43,4 +43,29 @@
   .fdl-error {
     @apply text-fdl-error text-sm mt-1;
   }
+
+  /* Intent label color-coded badges */
+  .intent-label-0 {
+    @apply bg-red-500 dark:bg-red-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
+  }
+  
+  .intent-label-1 {
+    @apply bg-blue-500 dark:bg-blue-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
+  }
+  
+  .intent-label-2 {
+    @apply bg-yellow-500 dark:bg-yellow-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
+  }
+  
+  .intent-label-3 {
+    @apply bg-green-500 dark:bg-green-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
+  }
+  
+  .intent-label-4 {
+    @apply bg-purple-500 dark:bg-purple-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
+  }
+  
+  .intent-label-5 {
+    @apply bg-pink-500 dark:bg-pink-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
+  }
 }

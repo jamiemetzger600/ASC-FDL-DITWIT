@@ -1098,7 +1098,19 @@ const FDLEditor: React.FC = () => {
                         <div key={intent.id} className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-700">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-2">
-                              <h3 className="font-medium text-gray-900 dark:text-gray-200">Intent {index + 1}</h3>
+                              <h3 className="font-medium text-gray-900 dark:text-gray-200">
+                                <span 
+                                  className="inline-block px-2 py-1 rounded-md text-xs font-semibold text-white mr-2"
+                                  style={{
+                                    backgroundColor: (() => {
+                                      const colors = ["#ef4444", "#3b82f6", "#eab308", "#10b981", "#8b5cf6", "#ec4899"]; // red, blue, yellow, green, purple, pink
+                                      return colors[index % colors.length];
+                                    })()
+                                  }}
+                                >
+                                  Intent {index + 1}
+                                </span>
+                              </h3>
                               <button 
                                 onClick={() => moveFramingIntent(index, 'up')}
                                 disabled={index === 0}
