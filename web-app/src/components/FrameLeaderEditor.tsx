@@ -3,7 +3,13 @@ import type { FDL, FramingIntent, Canvas, FramingDecision } from '../types/fdl';
 import { jsPDF, type jsPDFOptions } from 'jspdf';
 import 'svg2pdf.js'; // Extends jsPDF. Must be imported after jsPDF
 import { generateFDLId } from '../validation/fdlValidator';
-import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry'; // Import the function
+import { 
+  calculateFramingDecisionGeometry, 
+  calculateExactFrameDimensions, 
+  calculateFrameWithProtection,
+  DEFAULT_ROUNDING,
+  type RoundingConfig
+} from '../utils/fdlGeometry'; // Import the functions
 import { useFrameLeaderSettingsStore, type FrameLeaderSettings, type TextElementSettings, type CustomFont, type CustomImage } from '../stores/frameLeaderSettingsStore';
 
 const intentColors = ["#f87171", "#60a5fa", "#fbbf24", "#34d399", "#a78bfa", "#fb7185"];
@@ -379,28 +385,36 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
         {intentsToRender.map((intent, idx) => {
           const originalCanvasWidthPxForIntent = primaryCanvas.dimensions.width; 
           const originalCanvasHeightPxForIntent = primaryCanvas.dimensions.height;
-          const intentAr = intent.aspect_ratio.width / intent.aspect_ratio.height;
-          let fullIntentWidthPx = originalCanvasWidthPxForIntent;
-          let fullIntentHeightPx = originalCanvasWidthPxForIntent / intentAr;
-          if (fullIntentHeightPx > originalCanvasHeightPxForIntent) {
-            fullIntentHeightPx = originalCanvasHeightPxForIntent;
-            fullIntentWidthPx = originalCanvasHeightPxForIntent * intentAr;
-          }
-          let displayIntentWidthPx = fullIntentWidthPx;
-          let displayIntentHeightPx = fullIntentHeightPx;
+          
+          // Use precise calculation method with ASC FDL rounding
+          const frameDimensions = calculateExactFrameDimensions(
+            originalCanvasWidthPxForIntent,
+            originalCanvasHeightPxForIntent,
+            intent.aspect_ratio.width,
+            intent.aspect_ratio.height,
+            DEFAULT_ROUNDING
+          );
+          
+          let displayIntentWidthPx = frameDimensions.width;
+          let displayIntentHeightPx = frameDimensions.height;
           let anchorOffsetX = 0; 
           let anchorOffsetY = 0;
+          
           if (intent.protection && intent.protection > 0 && intent.protection < 100) {
-            const protectionPercent = intent.protection / 100;
-            const horizontalReduction = fullIntentWidthPx * protectionPercent;
-            const verticalReduction = fullIntentHeightPx * protectionPercent;
-            displayIntentWidthPx = fullIntentWidthPx - horizontalReduction;
-            displayIntentHeightPx = fullIntentHeightPx - verticalReduction;
-            anchorOffsetX = horizontalReduction / 2;
-            anchorOffsetY = verticalReduction / 2;
+            const protectionResult = calculateFrameWithProtection(
+              frameDimensions.width,
+              frameDimensions.height,
+              intent.protection,
+              DEFAULT_ROUNDING
+            );
+            displayIntentWidthPx = protectionResult.width;
+            displayIntentHeightPx = protectionResult.height;
+            anchorOffsetX = protectionResult.offsetX;
+            anchorOffsetY = protectionResult.offsetY;
           }
-          const intentBaseAnchorXPx = (originalCanvasWidthPxForIntent - fullIntentWidthPx) / 2;
-          const intentBaseAnchorYPx = (originalCanvasHeightPxForIntent - fullIntentHeightPx) / 2;
+          
+          const intentBaseAnchorXPx = (originalCanvasWidthPxForIntent - frameDimensions.width) / 2;
+          const intentBaseAnchorYPx = (originalCanvasHeightPxForIntent - frameDimensions.height) / 2;
           const finalIntentAnchorXPx = intentBaseAnchorXPx + anchorOffsetX;
           const finalIntentAnchorYPx = intentBaseAnchorYPx + anchorOffsetY;
           const scaledIntentWidth = displayIntentWidthPx * overallScale;

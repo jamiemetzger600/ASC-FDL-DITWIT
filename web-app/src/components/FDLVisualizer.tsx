@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
 import type { FDL, Canvas } from '../types/fdl';
+import { 
+  calculateExactFrameDimensions, 
+  calculateFrameWithProtection,
+  calculateSensorInfo,
+  formatNumberForDisplay,
+  calculatePreciseAspectRatio,
+  DEFAULT_ROUNDING,
+  type RoundingConfig
+} from '../utils/fdlGeometry';
 
 interface FDLVisualizerProps {
   fdl: FDL;
@@ -181,35 +190,36 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
             if (!intent.aspect_ratio || intent.aspect_ratio.width <= 0 || intent.aspect_ratio.height <= 0) return null;
             
-            const intentAr = intent.aspect_ratio.width / intent.aspect_ratio.height;
+            // Use precise calculation method with ASC FDL rounding
+            const frameDimensions = calculateExactFrameDimensions(
+              canvasWidthPx,
+              canvasHeightPx,
+              intent.aspect_ratio.width,
+              intent.aspect_ratio.height,
+              DEFAULT_ROUNDING
+            );
             
-            let fullIntentWidthPx = canvasWidthPx;
-            let fullIntentHeightPx = canvasWidthPx / intentAr;
-
-            if (fullIntentHeightPx > canvasHeightPx) {
-              fullIntentHeightPx = canvasHeightPx;
-              fullIntentWidthPx = canvasHeightPx * intentAr;
-            }
-            
-            let displayIntentWidthPx = fullIntentWidthPx;
-            let displayIntentHeightPx = fullIntentHeightPx;
+            let displayIntentWidthPx = frameDimensions.width;
+            let displayIntentHeightPx = frameDimensions.height;
             let anchorOffsetX = 0;
             let anchorOffsetY = 0;
 
             if (intent.protection && intent.protection > 0 && intent.protection < 100) {
-              const protectionPercent = intent.protection / 100;
-              const horizontalReduction = fullIntentWidthPx * protectionPercent;
-              const verticalReduction = fullIntentHeightPx * protectionPercent;
+              const protectionResult = calculateFrameWithProtection(
+                frameDimensions.width,
+                frameDimensions.height,
+                intent.protection,
+                DEFAULT_ROUNDING
+              );
 
-              displayIntentWidthPx = fullIntentWidthPx - horizontalReduction;
-              displayIntentHeightPx = fullIntentHeightPx - verticalReduction;
-              
-              anchorOffsetX = horizontalReduction / 2;
-              anchorOffsetY = verticalReduction / 2;
+              displayIntentWidthPx = protectionResult.width;
+              displayIntentHeightPx = protectionResult.height;
+              anchorOffsetX = protectionResult.offsetX;
+              anchorOffsetY = protectionResult.offsetY;
             }
 
-            const intentBaseAnchorXPx = (canvasWidthPx - fullIntentWidthPx) / 2;
-            const intentBaseAnchorYPx = (canvasHeightPx - fullIntentHeightPx) / 2;
+            const intentBaseAnchorXPx = (canvasWidthPx - frameDimensions.width) / 2;
+            const intentBaseAnchorYPx = (canvasHeightPx - frameDimensions.height) / 2;
             
             const finalIntentAnchorXPx = intentBaseAnchorXPx + anchorOffsetX;
             const finalIntentAnchorYPx = intentBaseAnchorYPx + anchorOffsetY;
@@ -295,26 +305,37 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     if (validIntents.length > 0) {
       techInfoText += `\nFraming Intents:\n`;
       validIntents.forEach((intent, index) => {
-        const intentAr = intent.aspect_ratio.width / intent.aspect_ratio.height;
+        const canvasWidth = primaryCanvas.dimensions?.width || 0;
+        const canvasHeight = primaryCanvas.dimensions?.height || 0;
         
-        let frameLineWidthPx = primaryCanvas.dimensions?.width || 0;
-        let frameLineHeightPx = frameLineWidthPx / intentAr;
-        if (frameLineHeightPx > (primaryCanvas.dimensions?.height || 0)) {
-          frameLineHeightPx = primaryCanvas.dimensions?.height || 0;
-          frameLineWidthPx = frameLineHeightPx * intentAr;
-        }
+        // Use precise calculation method with ASC FDL rounding
+        const frameDimensions = calculateExactFrameDimensions(
+          canvasWidth,
+          canvasHeight,
+          intent.aspect_ratio.width,
+          intent.aspect_ratio.height,
+          DEFAULT_ROUNDING
+        );
         
-        let displayWidth = frameLineWidthPx;
-        let displayHeight = frameLineHeightPx;
-        if(intent.protection && intent.protection > 0 && intent.protection < 100){
-          const protectionFactor = 1 - (intent.protection / 100);
-          displayWidth *= protectionFactor;
-          displayHeight *= protectionFactor;
+        let displayWidth = frameDimensions.width;
+        let displayHeight = frameDimensions.height;
+        
+        if (intent.protection && intent.protection > 0 && intent.protection < 100) {
+          const protectionResult = calculateFrameWithProtection(
+            frameDimensions.width,
+            frameDimensions.height,
+            intent.protection,
+            DEFAULT_ROUNDING
+          );
+          displayWidth = protectionResult.width;
+          displayHeight = protectionResult.height;
         }
 
+        const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
+
         techInfoText += `• ${intent.label || intent.id || `Intent ${index + 1}`}\n`;
-        techInfoText += `  Size: ${Math.round(displayWidth)} x ${Math.round(displayHeight)} px\n`;
-        techInfoText += `  Aspect Ratio: ${intent.aspect_ratio.width}:${intent.aspect_ratio.height} (${intentAr.toFixed(2)}:1)\n`;
+        techInfoText += `  Size: ${displayWidth} x ${displayHeight} px\n`;
+        techInfoText += `  Aspect Ratio: ${intent.aspect_ratio.width}:${intent.aspect_ratio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)\n`;
         if (intent.protection) {
           techInfoText += `  Protection: ${intent.protection}%\n`;
         }
@@ -408,22 +429,33 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         
         {(fdl.framing_intents || []).filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0).map((intent, index) => {
           const strokeColor = intentColors[index % intentColors.length];
-          const intentAr = intent.aspect_ratio.width / intent.aspect_ratio.height;
+          const canvasWidth = primaryCanvas.dimensions?.width || 0;
+          const canvasHeight = primaryCanvas.dimensions?.height || 0;
           
-          let frameLineWidthPx = primaryCanvas.dimensions?.width || 0;
-          let frameLineHeightPx = frameLineWidthPx / intentAr;
-          if (frameLineHeightPx > (primaryCanvas.dimensions?.height || 0)) {
-            frameLineHeightPx = primaryCanvas.dimensions?.height || 0;
-            frameLineWidthPx = frameLineHeightPx * intentAr;
-          }
+                     // Use precise calculation method with ASC FDL rounding
+           const frameDimensions = calculateExactFrameDimensions(
+             canvasWidth,
+             canvasHeight,
+             intent.aspect_ratio.width,
+             intent.aspect_ratio.height,
+             DEFAULT_ROUNDING
+           );
           
-          let displayWidth = frameLineWidthPx;
-          let displayHeight = frameLineHeightPx;
-          if(intent.protection && intent.protection > 0 && intent.protection < 100){
-            const protectionFactor = 1 - (intent.protection / 100);
-            displayWidth *= protectionFactor;
-            displayHeight *= protectionFactor;
+          let displayWidth = frameDimensions.width;
+          let displayHeight = frameDimensions.height;
+          
+          if (intent.protection && intent.protection > 0 && intent.protection < 100) {
+                         const protectionResult = calculateFrameWithProtection(
+               frameDimensions.width,
+               frameDimensions.height,
+               intent.protection,
+               DEFAULT_ROUNDING
+             );
+            displayWidth = protectionResult.width;
+            displayHeight = protectionResult.height;
           }
+
+          const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
 
           return (
             <div key={`tech-intent-${intent.id || index}`} style={{...techInfoSectionStyle, borderTop: '1px solid #333333', paddingTop: '0.75rem' }}>
@@ -431,8 +463,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
                 <span style={{ ...legendColorSwatchStyle, backgroundColor: `${strokeColor}B3`, borderColor: strokeColor }} />
                 <span style={{...techInfoLabelStyle, color: strokeColor, marginBottom: 0 }}>Frame Line: {intent.label || intent.id || `Intent ${index + 1}`}</span>
               </div>
-              <p style={techInfoValueStyle}>Size: {Math.round(displayWidth)} x {Math.round(displayHeight)} px</p>
-              <p style={techInfoValueStyle}>Aspect Ratio: {intent.aspect_ratio.width}:{intent.aspect_ratio.height} ({intentAr.toFixed(2)}:1)</p>
+              <p style={techInfoValueStyle}>Size: {displayWidth} x {displayHeight} px</p>
+              <p style={techInfoValueStyle}>Aspect Ratio: {intent.aspect_ratio.width}:{intent.aspect_ratio.height} ({formatNumberForDisplay(preciseAspectRatio)}:1)</p>
               {intent.protection && <p style={techInfoValueStyle}>Protection: {intent.protection}%</p>}
             </div>
           );
