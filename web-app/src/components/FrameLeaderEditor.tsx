@@ -7,6 +7,9 @@ import {
   calculateFramingDecisionGeometry, 
   calculateExactFrameDimensions, 
   calculateFrameWithProtection,
+  calculatePreciseAspectRatio,
+  formatNumberForDisplay,
+  calculateSensorInfo,
   DEFAULT_ROUNDING,
   type RoundingConfig
 } from '../utils/fdlGeometry'; // Import the functions
@@ -542,10 +545,15 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     const width = dimensions.width;
     const height = dimensions.height;
     
-    // Calculate sensor dimensions (this is placeholder - would need actual sensor info)
-    const pixelPitch = 0.00606; // Example for Alexa 35, would need camera-specific data
-    const sensorWidthMm = (width * pixelPitch).toFixed(2);
-    const sensorHeightMm = (height * pixelPitch).toFixed(2);
+    // Use photosite dimensions and physical dimensions for accurate calculations
+    const photositeDimensions = canvas.photosite_dimensions || { width, height };
+    const physicalDimensions = canvas.physical_dimensions || { width: 35.9, height: 24.0 }; // Default to full frame
+    
+    // Calculate sensor info using our mathematical tools
+    const sensorInfo = calculateSensorInfo(photositeDimensions, physicalDimensions);
+    const pixelPitch = sensorInfo.pixelPitch;
+    const sensorWidthMm = formatNumberForDisplay(physicalDimensions.width);
+    const sensorHeightMm = formatNumberForDisplay(physicalDimensions.height);
     
     const baseY = settings.cameraInfoPosition?.y || 120;
     const fontSize = settings.cameraInfoFontSize || 12;
@@ -589,11 +597,20 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     if (settings.showFormatArrow && validIntents.length > 0) {
       const primaryIntent = validIntents[0];
       if (primaryIntent.aspect_ratio) {
-        const aspectRatio = primaryIntent.aspect_ratio.width / primaryIntent.aspect_ratio.height;
-        const cropWidth = Math.round(height * aspectRatio);
-        const cropHeight = height;
-        const cropSensorWidthMm = (cropWidth * pixelPitch).toFixed(2);
-        const cropSensorHeightMm = (cropHeight * pixelPitch).toFixed(2);
+        // Use precise calculation method with ASC FDL rounding
+        const frameDimensions = calculateExactFrameDimensions(
+          width,
+          height,
+          primaryIntent.aspect_ratio.width,
+          primaryIntent.aspect_ratio.height,
+          DEFAULT_ROUNDING
+        );
+        
+        const cropWidth = frameDimensions.width;
+        const cropHeight = frameDimensions.height;
+        const preciseAspectRatio = calculatePreciseAspectRatio(primaryIntent.aspect_ratio.width, primaryIntent.aspect_ratio.height);
+        const cropSensorWidthMm = formatNumberForDisplay(cropWidth * pixelPitch);
+        const cropSensorHeightMm = formatNumberForDisplay(cropHeight * pixelPitch);
         
         // Format arrow (triangle)
         const x = settings.cameraInfoPosition?.x || 400;
@@ -604,8 +621,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
         );
         yOffset += 12;
         
-        // Format line
-        const formatText = `${aspectRatio.toFixed(2)}:1 (${cropWidth} x ${cropHeight}) [${cropSensorWidthMm} x ${cropSensorHeightMm} mm]`;
+        // Format line with precise calculations
+        const formatText = `${formatNumberForDisplay(preciseAspectRatio)}:1 (${cropWidth} x ${cropHeight}) [${cropSensorWidthMm} x ${cropSensorHeightMm} mm]`;
         elements.push(
           <text key="format-line" x={settings.cameraInfoPosition?.x || 400} y={baseY + yOffset} 
                 fontSize={fontSize - 1} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="middle">

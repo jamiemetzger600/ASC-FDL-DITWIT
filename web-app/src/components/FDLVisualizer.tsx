@@ -271,13 +271,13 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
     const sensorActiveImageArea = {
       photosites: `${primaryCanvas.photosite_dimensions?.width || 'N/A'} x ${primaryCanvas.photosite_dimensions?.height || 'N/A'} photosites`,
-      mm: `${primaryCanvas.physical_dimensions?.width?.toFixed(2) || 'N/A'} x ${primaryCanvas.physical_dimensions?.height?.toFixed(2) || 'N/A'} mm`,
+      mm: `${formatNumberForDisplay(primaryCanvas.physical_dimensions?.width || 0)} x ${formatNumberForDisplay(primaryCanvas.physical_dimensions?.height || 0)} mm`,
       photositeCount: primaryCanvas.photosite_dimensions?.width && primaryCanvas.photosite_dimensions?.height ? (primaryCanvas.photosite_dimensions.width * primaryCanvas.photosite_dimensions.height).toLocaleString() : 'N/A',
     };
     
     const imageCircle = {
         mm: primaryCanvas.physical_dimensions?.width && primaryCanvas.physical_dimensions?.height ? 
-            Math.sqrt(Math.pow(primaryCanvas.physical_dimensions.width, 2) + Math.pow(primaryCanvas.physical_dimensions.height, 2)).toFixed(2) + ' mm' 
+            formatNumberForDisplay(Math.sqrt(Math.pow(primaryCanvas.physical_dimensions.width, 2) + Math.pow(primaryCanvas.physical_dimensions.height, 2))) + ' mm' 
             : 'N/A',
     };
 
@@ -358,13 +358,13 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
     const sensorActiveImageArea = {
       photosites: `${primaryCanvas.photosite_dimensions?.width || 'N/A'} x ${primaryCanvas.photosite_dimensions?.height || 'N/A'} photosites`,
-      mm: `${primaryCanvas.physical_dimensions?.width?.toFixed(2) || 'N/A'} x ${primaryCanvas.physical_dimensions?.height?.toFixed(2) || 'N/A'} mm`,
+      mm: `${formatNumberForDisplay(primaryCanvas.physical_dimensions?.width || 0)} x ${formatNumberForDisplay(primaryCanvas.physical_dimensions?.height || 0)} mm`,
       photositeCount: primaryCanvas.photosite_dimensions?.width && primaryCanvas.photosite_dimensions?.height ? (primaryCanvas.photosite_dimensions.width * primaryCanvas.photosite_dimensions.height).toLocaleString() : 'N/A',
     };
     
     const imageCircle = {
         mm: primaryCanvas.physical_dimensions?.width && primaryCanvas.physical_dimensions?.height ? 
-            Math.sqrt(Math.pow(primaryCanvas.physical_dimensions.width, 2) + Math.pow(primaryCanvas.physical_dimensions.height, 2)).toFixed(2) + ' mm' 
+            formatNumberForDisplay(Math.sqrt(Math.pow(primaryCanvas.physical_dimensions.width, 2) + Math.pow(primaryCanvas.physical_dimensions.height, 2))) + ' mm' 
             : 'N/A',
     };
 
@@ -374,29 +374,54 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
       <div style={techInfoPanelStyle}>
         <div style={{...techInfoHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
           <h4 style={{margin: 0, fontSize: '0.9rem', fontWeight: 'bold'}}>Technical Information</h4>
-          <button
-            onClick={copyTechnicalInfo}
-            style={{
-              backgroundColor: copySuccess ? '#10b981' : '#4a5568',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.25rem',
-              padding: '0.5rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              fontSize: '0.75rem',
-              transition: 'background-color 0.2s'
-            }}
-            title="Copy technical information to clipboard"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            {copySuccess ? 'Copied!' : 'Copy'}
-          </button>
+          <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
+            <button
+              onClick={() => setShowTechInfo(false)}
+              style={{
+                backgroundColor: '#4a5568',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.25rem',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.75rem',
+                transition: 'background-color 0.2s'
+              }}
+              title="Close technical information panel"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Close
+            </button>
+            <button
+              onClick={copyTechnicalInfo}
+              style={{
+                backgroundColor: copySuccess ? '#10b981' : '#4a5568',
+                color: 'white',
+                border: 'none',
+                borderRadius: '0.25rem',
+                padding: '0.5rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.75rem',
+                transition: 'background-color 0.2s'
+              }}
+              title="Copy technical information to clipboard"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              {copySuccess ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
         </div>
         
         <div style={{flex: 1, overflowY: 'auto', paddingRight: '0.5rem'}}>
