@@ -1108,95 +1108,51 @@ const FDLEditor: React.FC = () => {
                                     placeholder="e.g., Main Sensor, VFX Plate"
                                   />
                                 </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Canvas Width (px)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={primaryCanvas.dimensions?.width || ''}
-                                    readOnly 
-                                    className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md focus:outline-none"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Canvas Height (px)
-                                  </label>
-                                  <input
-                                    type="number"
-                                    value={primaryCanvas.dimensions?.height || ''}
-                                    readOnly 
-                                    className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md focus:outline-none"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Advanced Settings Toggle */}
-                              <div className="mt-4">
-                                <button 
-                                  onClick={() => toggleAdvancedSettings(contextIndex)}
-                                  className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                                >
-                                  {showAdvancedSettings[contextIndex] ? 'Hide' : 'Show'} Advanced Canvas Settings
-                                </button>
-                              </div>
-
-                              {/* ADVANCED CANVAS FIELDS - Conditionally Rendered */}
-                              {showAdvancedSettings[contextIndex] && primaryCanvas && (
-                                <div className="mt-3 pt-3 border-t border-gray-400 dark:border-gray-500 space-y-3">
-                                  <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Advanced Canvas Properties</h5>
-                                  
-                                  {/* Effective Dimensions */}
+                              {/* Canvas Width & Height and Advanced Settings - TEMPORARILY HIDDEN */}
+                              {/* TODO: Re-enable these fields when ready (see ROADMAP.md) */}
+                              {false && (
+                                <>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Effective Width (px)</label>
-                                      <input type="number" value={primaryCanvas.effective_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_dimensions: { ...(primaryCanvas.effective_dimensions || { width:0, height:0 }), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
+                                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Canvas Width (px)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={primaryCanvas?.dimensions?.width || ''}
+                                        readOnly 
+                                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md focus:outline-none"
+                                      />
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Effective Height (px)</label>
-                                      <input type="number" value={primaryCanvas.effective_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_dimensions: { ...(primaryCanvas.effective_dimensions || { width:0, height:0 }), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
+                                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Canvas Height (px)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={primaryCanvas?.dimensions?.height || ''}
+                                        readOnly 
+                                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md focus:outline-none"
+                                      />
                                     </div>
                                   </div>
 
-                                  {/* Effective Anchor Point */}
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Effective Anchor X</label>
-                                      <input type="number" value={primaryCanvas.effective_anchor_point?.x || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_anchor_point: { ...(primaryCanvas.effective_anchor_point || {x:0, y:0}), x: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Effective Anchor Y</label>
-                                      <input type="number" value={primaryCanvas.effective_anchor_point?.y || ''} onChange={(e) => updateCanvas(contextIndex, 0, { effective_anchor_point: { ...(primaryCanvas.effective_anchor_point || {x:0, y:0}), y: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
-                                    </div>
+                                  <div className="mt-4">
+                                    <button 
+                                      onClick={() => toggleAdvancedSettings(contextIndex)}
+                                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                                    >
+                                      {showAdvancedSettings[contextIndex] ? 'Hide' : 'Show'} Advanced Canvas Settings
+                                    </button>
                                   </div>
 
-                                  {/* Photosite Dimensions */}
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Photosite Width (px)</label>
-                                      <input type="number" value={primaryCanvas.photosite_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { photosite_dimensions: { ...(primaryCanvas.photosite_dimensions || {width:0, height:0}), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
+                                  {showAdvancedSettings[contextIndex] && primaryCanvas && (
+                                    <div className="mt-3 pt-3 border-t border-gray-400 dark:border-gray-500 space-y-3">
+                                      <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Advanced Canvas Properties</h5>
+                                      {/* All the advanced canvas fields would go here */}
                                     </div>
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Photosite Height (px)</label>
-                                      <input type="number" value={primaryCanvas.photosite_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { photosite_dimensions: { ...(primaryCanvas.photosite_dimensions || {width:0, height:0}), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
-                                    </div>
-                                  </div>
-
-                                  {/* Physical Dimensions */}
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Physical Width (mm)</label>
-                                      <input type="number" step="0.01" value={primaryCanvas.physical_dimensions?.width || ''} onChange={(e) => updateCanvas(contextIndex, 0, { physical_dimensions: { ...(primaryCanvas.physical_dimensions || {width:0, height:0}), width: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Physical Height (mm)</label>
-                                      <input type="number" step="0.01" value={primaryCanvas.physical_dimensions?.height || ''} onChange={(e) => updateCanvas(contextIndex, 0, { physical_dimensions: { ...(primaryCanvas.physical_dimensions || {width:0, height:0}), height: Number(e.target.value) }})} className="w-full px-2 py-1 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md text-sm" />
-                                    </div>
-                                  </div>
-                                  
-                                </div>
+                                  )}
+                                </>
                               )}
                             </div>
                           )}
