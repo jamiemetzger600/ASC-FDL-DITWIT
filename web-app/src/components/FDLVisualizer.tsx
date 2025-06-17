@@ -370,7 +370,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
       uuid: fdl.uuid,
       version: fdl.version,
       ...(fdl.fdl_creator && { fdl_creator: fdl.fdl_creator }),
-      ...(fdl.default_framing_intent && { default_framing_intent: fdl.default_framing_intent }),
+      // Automatically set the first framing intent as the default
+      ...(fdl.framing_intents && fdl.framing_intents.length > 0 && { default_framing_intent: fdl.framing_intents[0].id }),
       ...(fdl.framing_intents && fdl.framing_intents.length > 0 && { 
         framing_intents: fdl.framing_intents.map(intent => ({
           ...(intent.label && { label: intent.label }),
@@ -905,34 +906,36 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
             </div>
           </div>
 
-          {/* Export Arri XML Section */}
-          <div>
-            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Arri XML Format</h5>
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-              <div className="flex-1 min-w-0">
-                <label htmlFor="arri-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Filename
-                </label>
-                <input
-                  type="text"
-                  id="arri-export-filename"
-                  value={arriExportFilename}
-                  onChange={(e) => setArriExportFilename(e.target.value)}
-                  placeholder="framelines"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Camera-ready format for Arri cameras (<span className="font-mono">.xml</span>)
-                </p>
+          {/* Export Arri XML Section - Only show when Arri camera is selected */}
+          {activeContext?.meta?.manufacturer === 'ARRI' && (
+            <div>
+              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Arri XML Format</h5>
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                <div className="flex-1 min-w-0">
+                  <label htmlFor="arri-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Filename
+                  </label>
+                  <input
+                    type="text"
+                    id="arri-export-filename"
+                    value={arriExportFilename}
+                    onChange={(e) => setArriExportFilename(e.target.value)}
+                    placeholder="framelines"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Camera-ready format for Arri cameras (<span className="font-mono">.xml</span>)
+                  </p>
+                </div>
+                <button
+                  onClick={handleExportArriXML}
+                  className="fdl-button-secondary text-sm px-4 py-2 whitespace-nowrap"
+                >
+                  Export Arri XML
+                </button>
               </div>
-              <button
-                onClick={handleExportArriXML}
-                className="fdl-button-secondary text-sm px-4 py-2 whitespace-nowrap"
-              >
-                Export Arri XML
-              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
       

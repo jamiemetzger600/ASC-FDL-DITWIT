@@ -377,6 +377,51 @@ const FDLEditor: React.FC = () => {
     };
     reader.readAsText(file);
   };
+
+  const handleReset = () => {
+    // Reset FDL to initial state
+    const initialFdl: FDL = {
+      uuid: generateFDLId('fdl'),
+      version: { major: 1, minor: 1 },
+      fdl_creator: 'ASC-DIT-FDL',
+      framing_intents: [],
+      contexts: []
+    };
+    setFdl(initialFdl);
+    
+    // Reset frame leader settings using the store
+    const { resetSettings } = useFrameLeaderSettingsStore.getState();
+    const defaultSettings = {
+      title: { text: '', fontSize: 18, position: { x: 400, y: 50 }, fontFamily: 'Arial', bold: true, italic: false, underline: false, visible: true },
+      director: { text: '', fontSize: 14, position: { x: 400, y: 75 }, fontFamily: 'Arial', bold: false, italic: false, underline: false, visible: true },
+      dp: { text: '', fontSize: 14, position: { x: 400, y: 95 }, fontFamily: 'Arial', bold: false, italic: false, underline: false, visible: true },
+      text1: { text: '', fontSize: 12, position: { x: 50, y: 50 }, fontFamily: 'Arial', bold: false, italic: false, underline: false, visible: false },
+      text2: { text: '', fontSize: 12, position: { x: 50, y: 100 }, fontFamily: 'Arial', bold: false, italic: false, underline: false, visible: false },
+      intentVisibility: {},
+      intentArrowVisibility: {},
+      centerMarkerEnabled: true,
+      centerMarkerSize: 20,
+      siemensStarsEnabled: false,
+      siemensStarsSize: 50,
+      anamorphicDesqueezeInPreview: false,
+      showCameraInfo: true,
+      showPixelDimensions: true,
+      showSensorDimensions: true,
+      showFormatArrow: true,
+      showFramingArrows: false,
+      cameraInfoPosition: { x: 400, y: 120 },
+      cameraInfoFontSize: 12,
+      customFonts: [],
+      customImages: []
+    };
+    resetSettings(defaultSettings);
+    
+    // Reset visualization selection
+    setSelectedVisualizedContextIndex(null);
+    
+    // Reset camera selections
+    setSelectedCameraSelections([]);
+  };
   
   const updateFDL = (newFdl: Partial<FDL>) => {
     setFdl({ ...fdl, ...newFdl });
@@ -648,6 +693,10 @@ const FDLEditor: React.FC = () => {
       label: `Camera Setup ${(fdl.contexts?.length || 0) + 1}`,
       context_creator: fdl.fdl_creator || '',
       canvases: [defaultCanvas],
+      meta: {
+        manufacturer: defaultManufacturerData?.name || '',
+        model: defaultModelData?.name || '',
+      },
     };
     
     // Update FDL
@@ -775,6 +824,20 @@ const FDLEditor: React.FC = () => {
     newSelections[contextIndex] = currentSelection;
     setSelectedCameraSelections(newSelections);
 
+    // Update the context meta information with manufacturer and model
+    const newFdlContexts = [...(fdl.contexts || [])];
+    if (newFdlContexts[contextIndex]) {
+      newFdlContexts[contextIndex] = {
+        ...newFdlContexts[contextIndex],
+        meta: {
+          ...newFdlContexts[contextIndex].meta,
+          manufacturer: currentSelection.manufacturer,
+          model: currentSelection.model,
+        }
+      };
+      updateFDL({ contexts: newFdlContexts });
+    }
+
     if (Object.keys(newCanvasProps).length > 0) {
       const existingCanvas = fdl.contexts?.[contextIndex]?.canvases?.[0];
       const finalCanvasProps: Partial<Canvas> = {
@@ -816,13 +879,34 @@ const FDLEditor: React.FC = () => {
 
   return (
     <div>
-      <Header onExport={handleExport} onImport={handleImport} />
+      <Header onExport={handleExport} onImport={handleImport} onReset={handleReset} />
       <div className="p-6">
         <div className="space-y-8">
                 <div className="text-gray-700 dark:text-gray-300 bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700 rounded-md p-4">
                   <p>
                     Thanks for checking out my ASC-FDL creation tool. FDL stands for Frameline Decision List and will be similar to CDL but with photoshop style layer controls. The ASC comittee is still working on definining the release SPEC for FDL - so this tool is extremely ALPHA. As far as I know, FDL is only supported in colorfront as of now. Software companies and Camera companies should support FDL once the spec is final. For the meantime, I will continue to build this app so it's ready to go once the SPEC is live. I'll add backwards compatibility as well so you can use it to generate regular frameline files for Arri/Red/Sony. Please play around and test this. Please send me ideas and feedback. I'm pretty quick to respond - I want this tool to be great. <a href="mailto:jamiemetzger@gmail.com" className="text-blue-600 hover:underline">jamiemetzger@gmail.com</a>
                   </p>
+                </div>
+
+                {/* FDL Metadata */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">FDL Creator Information</h2>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      FDL Creator
+                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">(Your name, email, and phone for contact)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={fdl.fdl_creator || ''}
+                      onChange={(e) => updateFDL({ fdl_creator: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., John Doe - john@example.com - (555) 123-4567"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This information helps others contact you if there are questions about this FDL.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Camera & Canvas Setups */}
@@ -946,23 +1030,59 @@ const FDLEditor: React.FC = () => {
                           {/* Primary Canvas Details */} 
                           {primaryCanvas && (
                             <div className="mt-3 pt-3 border-t border-gray-400 dark:border-gray-500 space-y-3">
-                               <div>
-                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Context Label (Internal Use)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={context.label || ''}
-                                    onChange={(e) => {
-                                      const newContexts = [...(fdl.contexts || [])];
-                                      if(newContexts[contextIndex]) {
-                                          newContexts[contextIndex] = {...newContexts[contextIndex], label: e.target.value };
-                                          updateFDL({contexts: newContexts});
-                                      }
-                                    }}
-                                    className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="e.g., A-Cam, Scene 5 Setup"
-                                  />
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                      Context Label (Internal Use)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={context.label || ''}
+                                      onChange={(e) => {
+                                        const newContexts = [...(fdl.contexts || [])];
+                                        if(newContexts[contextIndex]) {
+                                            newContexts[contextIndex] = {...newContexts[contextIndex], label: e.target.value };
+                                            updateFDL({contexts: newContexts});
+                                        }
+                                      }}
+                                      className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      placeholder="e.g., A-Cam, Scene 5 Setup"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                      Context Creator
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">(Who created this setup)</span>
+                                    </label>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={context.context_creator || ''}
+                                        onChange={(e) => {
+                                          const newContexts = [...(fdl.contexts || [])];
+                                          if(newContexts[contextIndex]) {
+                                              newContexts[contextIndex] = {...newContexts[contextIndex], context_creator: e.target.value };
+                                              updateFDL({contexts: newContexts});
+                                          }
+                                        }}
+                                        className="flex-1 px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="e.g., DIT, Camera Op"
+                                      />
+                                      <button
+                                        onClick={() => {
+                                          const newContexts = [...(fdl.contexts || [])];
+                                          if(newContexts[contextIndex]) {
+                                              newContexts[contextIndex] = {...newContexts[contextIndex], context_creator: fdl.fdl_creator || 'ASC-DIT-FDL' };
+                                              updateFDL({contexts: newContexts});
+                                          }
+                                        }}
+                                        className="px-2 py-2 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 whitespace-nowrap"
+                                        title="Copy from FDL Creator"
+                                      >
+                                        Copy
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                                  <div>
                                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -1247,21 +1367,11 @@ const FDLEditor: React.FC = () => {
                     )}
 
                     <div className="pt-4 mt-4 border-t border-gray-400 dark:border-gray-500">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Default Framing Intent
-                      </label>
-                      <select
-                        value={fdl.default_framing_intent || ''}
-                        onChange={(e) => updateFDL({ default_framing_intent: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">None</option>
-                        {(fdl.framing_intents || []).map((intent) => (
-                          <option key={intent.id} value={intent.id}>
-                            {intent.label || intent.id}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          <strong>Default Framing Intent:</strong> The first intent in your list (Intent 1) will be used as the default framing intent in your exported FDL. Use the up/down arrows to reorder intents and change which one is the default.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -6,11 +6,12 @@ import { ProjectManager } from '../utils/projectManager';
 interface HeaderProps {
   onExport: () => void;
   onImport: (file: File) => void;
+  onReset: () => void;
   // onToggleTestDataViewer: () => void;
   // isTestDataViewerVisible: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onExport, onImport }) => {
+const Header: React.FC<HeaderProps> = ({ onExport, onImport, onReset }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectFileInputRef = useRef<HTMLInputElement>(null);
   const { settings, setSettings } = useFrameLeaderSettingsStore();
@@ -69,6 +70,12 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport }) => {
     alert('Project data is saved automatically!');
   };
 
+  const handleResetAll = () => {
+    if (confirm('Are you sure you want to reset all data? This will clear all FDL data and frame leader settings. This action cannot be undone.')) {
+      onReset();
+    }
+  };
+
   return (
     <header className="bg-gray-50 dark:bg-gray-800 shadow-sm border-b border-gray-400 dark:border-gray-600 sticky top-0 z-50">
       <div className="fdl-container">
@@ -82,8 +89,16 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport }) => {
 
           {/* Actions */}
           <div className="flex items-center space-x-2">
-            {/* Import Buttons */}
+            {/* Reset and Import Buttons */}
             <div className="flex items-center space-x-1">
+              <button
+                onClick={handleResetAll}
+                className="bg-red-600 text-white text-sm px-3 py-2 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+                title="Reset all data and settings (development)"
+              >
+                Reset All
+              </button>
+              
               <button
                 onClick={handleImportClick}
                 className="fdl-button-secondary text-sm px-3 py-2"
