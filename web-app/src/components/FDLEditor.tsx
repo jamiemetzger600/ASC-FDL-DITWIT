@@ -8,6 +8,7 @@ import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry';
 import Header from './Header';
 import { useFrameLeaderSettingsStore } from '../stores/frameLeaderSettingsStore';
 import { useFdlStore } from '../stores/fdlStore';
+import { exportFDLFile } from '../utils/fdlExport';
 
 interface FDLEditorProps {
   fdl: FDL;
@@ -350,24 +351,8 @@ const FDLEditor: React.FC = () => {
   }, [fdl.contexts]);
 
   const handleExport = () => {
-    // Ensure FDL always has a UUID and version before export
-    const exportFdl = {
-      ...fdl,
-      uuid: fdl.uuid || generateFDLId('fdl'),
-      version: fdl.version || { major: 1, minor: 1 },
-      // Automatically set the first framing intent as the default if intents exist
-      ...(fdl.framing_intents && fdl.framing_intents.length > 0 && { default_framing_intent: fdl.framing_intents[0].id }),
-    };
-    
-    const dataStr = JSON.stringify(exportFdl, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    
-    const exportFileDefaultName = `fdl_${new Date().toISOString().split('T')[0]}.fdl`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
+    // Use the shared export function for consistency
+    exportFDLFile(fdl);
   };
 
   const handleImport = (file: File) => {
