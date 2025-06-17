@@ -9,6 +9,7 @@ import {
   DEFAULT_ROUNDING,
   type RoundingConfig
 } from '../utils/fdlGeometry';
+import { generateFDLId } from '../validation/fdlValidator';
 
 interface FDLVisualizerProps {
   fdl: FDL;
@@ -367,8 +368,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     
     // Create ASC FDL compliant structure following the specification exactly
     const ascCompliantFDL = {
-      uuid: fdl.uuid,
-      version: fdl.version,
+      uuid: fdl.uuid || generateFDLId('fdl'),
+      version: fdl.version || { major: 1, minor: 1 },
       ...(fdl.fdl_creator && { fdl_creator: fdl.fdl_creator }),
       // Automatically set the first framing intent as the default
       ...(fdl.framing_intents && fdl.framing_intents.length > 0 && { default_framing_intent: fdl.framing_intents[0].id }),

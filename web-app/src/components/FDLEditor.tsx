@@ -350,7 +350,16 @@ const FDLEditor: React.FC = () => {
   }, [fdl.contexts]);
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(fdl, null, 2);
+    // Ensure FDL always has a UUID and version before export
+    const exportFdl = {
+      ...fdl,
+      uuid: fdl.uuid || generateFDLId('fdl'),
+      version: fdl.version || { major: 1, minor: 1 },
+      // Automatically set the first framing intent as the default if intents exist
+      ...(fdl.framing_intents && fdl.framing_intents.length > 0 && { default_framing_intent: fdl.framing_intents[0].id }),
+    };
+    
+    const dataStr = JSON.stringify(exportFdl, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     
     const exportFileDefaultName = `fdl_${new Date().toISOString().split('T')[0]}.fdl`;
@@ -368,7 +377,16 @@ const FDLEditor: React.FC = () => {
         const result = e.target?.result as string;
         const importedFdl = JSON.parse(result) as FDL;
         
-        setFdl(importedFdl);
+        // Ensure imported FDL has required fields
+        const validatedFdl: FDL = {
+          ...importedFdl,
+          uuid: importedFdl.uuid || generateFDLId('fdl'),
+          version: importedFdl.version || { major: 1, minor: 1 },
+          framing_intents: importedFdl.framing_intents || [],
+          contexts: importedFdl.contexts || [],
+        };
+        
+        setFdl(validatedFdl);
         alert('FDL imported successfully!');
       } catch (error) {
         console.error('Error importing FDL file:', error);
@@ -424,7 +442,16 @@ const FDLEditor: React.FC = () => {
   };
   
   const updateFDL = (newFdl: Partial<FDL>) => {
-    setFdl({ ...fdl, ...newFdl });
+    const updatedFdl = { ...fdl, ...newFdl };
+    // Ensure UUID always exists
+    if (!updatedFdl.uuid) {
+      updatedFdl.uuid = generateFDLId('fdl');
+    }
+    // Ensure version always exists
+    if (!updatedFdl.version) {
+      updatedFdl.version = { major: 1, minor: 1 };
+    }
+    setFdl(updatedFdl);
   };
 
   // Initialize selectedCameraSelections based on the initial FDL or defaults
