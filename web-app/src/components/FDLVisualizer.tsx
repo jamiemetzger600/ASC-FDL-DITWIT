@@ -259,7 +259,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
                 >
                   {intent.label || `Frameline ${originalIndex + 1}`}
                   {contextRotation ? ` (${getRotationLabel(contextRotation).replace('No Rotation (0°)', '').replace('°', '°')})` : ''}
-                  {intent.protection ? ` (${intent.protection}% prot.)` : ''}
+                  {intent.protection ? ` (${intent.protection}% ext.)` : ''}
                 </text>
               </g>
             );
@@ -356,9 +356,9 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         if (intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0)) {
           techInfoText += `  Offset: ${intent.offset.x}px, ${intent.offset.y}px\n`;
         }
-        if (intent.protection) {
-          techInfoText += `  Protection: ${intent.protection}%\n`;
-        }
+                  if (intent.protection) {
+            techInfoText += `  Extraction: ${intent.protection}%\n`;
+          }
       });
     }
 
@@ -725,7 +725,7 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
               </div>
               <p style={techInfoValueStyle}>Size: {displayWidth} x {displayHeight} px</p>
               <p style={techInfoValueStyle}>Aspect Ratio: {intent.aspect_ratio.width}:{intent.aspect_ratio.height} ({formatNumberForDisplay(preciseAspectRatio)}:1)</p>
-              {intent.protection && <p style={techInfoValueStyle}>Protection: {intent.protection}%</p>}
+                              {intent.protection && <p style={techInfoValueStyle}>Extraction: {intent.protection}%</p>}
             </div>
           );
         })}

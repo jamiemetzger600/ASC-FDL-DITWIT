@@ -1318,11 +1318,11 @@ const FDLEditor: React.FC = () => {
 
                           </div>
 
-                          {/* Second Row for Protection, Width, Height */}
+                          {/* Second Row for Extraction, Width, Height */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Protection (%)
+                                Extraction (%)
                               </label>
                               <input
                                 type="number"
