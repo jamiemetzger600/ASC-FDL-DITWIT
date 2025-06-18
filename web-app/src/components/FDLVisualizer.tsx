@@ -257,7 +257,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
                   textAnchor="end"
                   style={{ pointerEvents: 'none', fontWeight: 'bold' }}
                 >
-                  {intent.label || intent.id}
+                  {intent.label || `Frameline ${originalIndex + 1}`}
                   {contextRotation ? ` (${getRotationLabel(contextRotation).replace('No Rotation (0°)', '').replace('°', '°')})` : ''}
                   {intent.protection ? ` (${intent.protection}% prot.)` : ''}
                 </text>
@@ -272,7 +272,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
   } else if (visualizedContextIndex === null && fdl.contexts && fdl.contexts.length > 0) {
     canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">Select a Camera Setup from the dropdown above to visualize.</p>;
   } else {
-    canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">No Camera Setup selected or available to display intents.</p>;
+    canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">No Camera Setup selected or available to display framelines.</p>;
   }
 
   const copyTechnicalInfo = async () => {
@@ -317,7 +317,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     const validIntents = (fdl.framing_intents || []).filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0);
     
     if (validIntents.length > 0) {
-      techInfoText += `\nFraming Intents:\n`;
+      techInfoText += `\nFramelines:\n`;
       validIntents.forEach((intent, index) => {
         const canvasWidth = primaryCanvas.dimensions?.width || 0;
         const canvasHeight = primaryCanvas.dimensions?.height || 0;
@@ -350,7 +350,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
         const preciseAspectRatio = calculatePreciseAspectRatio(transformResult.effectiveAspectRatio.width, transformResult.effectiveAspectRatio.height);
 
-        techInfoText += `• ${intent.label || intent.id || `Intent ${index + 1}`}\n`;
+                  techInfoText += `• ${intent.label || `Frameline ${index + 1}`}\n`;
         techInfoText += `  Size: ${displayWidth} x ${displayHeight} px\n`;
         techInfoText += `  Aspect Ratio: ${transformResult.effectiveAspectRatio.width}:${transformResult.effectiveAspectRatio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)\n`;
         if (intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0)) {
@@ -390,13 +390,13 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
     const filename = `${sanitizedFilename}.xml`;
 
-    // Get valid framing intents (max 3 for Arri)
+            // Get valid framelines (max 3 for Arri)
     const validIntents = (fdl.framing_intents || [])
       .filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0)
       .slice(0, 3); // Arri supports formatA, formatB, formatC
 
     if (validIntents.length === 0) {
-      alert('No valid framing intents found for Arri XML export.');
+      alert('No valid framelines found for Arri XML export.');
       return;
     }
 
@@ -721,7 +721,7 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
             <div key={`tech-intent-${intent.id || index}`} style={{...techInfoSectionStyle, borderTop: '1px solid #333333', paddingTop: '0.75rem' }}>
               <div style={{display: 'flex', alignItems: 'center', marginBottom: '0.3rem'}}>
                 <span style={{ ...legendColorSwatchStyle, backgroundColor: `${strokeColor}B3`, borderColor: strokeColor }} />
-                <span style={{...techInfoLabelStyle, color: strokeColor, marginBottom: 0 }}>Frame Line: {intent.label || intent.id || `Intent ${index + 1}`}</span>
+                <span style={{...techInfoLabelStyle, color: strokeColor, marginBottom: 0 }}>Frame Line: {intent.label || `Frameline ${index + 1}`}</span>
               </div>
               <p style={techInfoValueStyle}>Size: {displayWidth} x {displayHeight} px</p>
               <p style={techInfoValueStyle}>Aspect Ratio: {intent.aspect_ratio.width}:{intent.aspect_ratio.height} ({formatNumberForDisplay(preciseAspectRatio)}:1)</p>
@@ -730,7 +730,7 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
           );
         })}
         {(!fdl.framing_intents || fdl.framing_intents.filter(i => i.aspect_ratio && i.aspect_ratio.width > 0 && i.aspect_ratio.height > 0).length === 0) && (
-           <p style={{...techInfoValueStyle, fontStyle: 'italic' }}>No valid framing intents.</p>
+           <p style={{...techInfoValueStyle, fontStyle: 'italic' }}>No valid framelines.</p>
         )}
         </div>
       </div>

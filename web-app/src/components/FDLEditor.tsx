@@ -1217,15 +1217,15 @@ const FDLEditor: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Framing Intents */}
+                {/* Framelines */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Framing Intents</h2>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Framelines</h2>
                     <button
                       onClick={addFramingIntent}
                       className="fdl-button-primary text-sm"
                     >
-                      Add Intent
+                      Add Frameline
                     </button>
                   </div>
                   <div className="space-y-4">
@@ -1305,7 +1305,7 @@ const FDLEditor: React.FC = () => {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                Label
+                                Frameline Label
                               </label>
                               <input
                                 type="text"
@@ -1315,17 +1315,7 @@ const FDLEditor: React.FC = () => {
                                 placeholder="e.g., 16:9 or Safety"
                               />
                             </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                ID (Internal Use)
-                              </label>
-                              <input
-                                type="text"
-                                value={intent.id}
-                                readOnly
-                                className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md focus:outline-none"
-                              />
-                            </div>
+
                           </div>
 
                           {/* Second Row for Protection, Width, Height */}
@@ -1540,14 +1530,14 @@ const FDLEditor: React.FC = () => {
                     })}
                     {(!fdl.framing_intents || fdl.framing_intents.length === 0) && (
                       <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        No framing intents defined. Click "Add Intent" to get started.
+                        No framelines defined. Click "Add Frameline" to get started.
                       </div>
                     )}
 
                     <div className="pt-4 mt-4 border-t border-gray-400 dark:border-gray-500">
                       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
                         <p className="text-sm text-blue-800 dark:text-blue-200">
-                          <strong>Default Framing Intent:</strong> The first intent in your list (Intent 1) will be used as the default framing intent in your exported FDL. Use the up/down arrows to reorder intents and change which one is the default.
+                          <strong>Default Frameline:</strong> The first frameline in your list (Frameline 1) will be used as the default frameline in your exported FDL. Use the up/down arrows to reorder framelines and change which one is the default.
                         </p>
                       </div>
                     </div>

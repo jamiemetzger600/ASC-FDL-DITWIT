@@ -1354,9 +1354,9 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
 
             {/* Right Column: Other Controls in new order */}
             <div className="md:col-span-1 space-y-4 md:pl-4">
-              {/* Framing Intents Visibility */}
+              {/* Framelines Visibility */}
               <div className="border-2 border-gray-400 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Framing Intents Display</h4>
+                <h4 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-2">Framelines Display</h4>
                 {validIntents.length > 0 ? (
                   validIntents.map((intent, idx) => (
                     <div key={intent.id} className="flex items-center mb-1">
@@ -1385,7 +1385,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-gray-500">No valid framing intents defined in FDL.</p>
+                  <p className="text-sm text-gray-500">No valid framelines defined in FDL.</p>
                 )}
               </div>
               
@@ -1507,7 +1507,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                           onChange={e => handleGenericSettingChange('showFormatArrow', e.target.checked)} 
                           className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                        Show Framing Intent
+                        Show Frameline
                       </label>
                       <label className="flex items-center text-xs text-gray-700 cursor-pointer">
                         <input 
