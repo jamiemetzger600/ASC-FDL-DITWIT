@@ -348,6 +348,21 @@ const FDLEditor: React.FC = () => {
   const { fdl, setFdl, projectName, setProjectName } = useFdlStore();
   const { settings, updateSettings } = useFrameLeaderSettingsStore();
   const [selectedVisualizedContextIndex, setSelectedVisualizedContextIndex] = useState<number | null>(null);
+  
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState({
+    projectInfo: false,
+    cameraSetups: false,
+    framelines: false,
+    visualizer: false
+  });
+
+  const toggleSection = (section: keyof typeof collapsedSections) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   useEffect(() => {
     // ... existing code ...
@@ -908,7 +923,13 @@ const FDLEditor: React.FC = () => {
 
                 {/* FDL Metadata */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Project Information</h2>
+                  <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => toggleSection('projectInfo')}>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Project Information</h2>
+                    <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-xl">
+                      {collapsedSections.projectInfo ? '▼' : '▲'}
+                    </button>
+                  </div>
+                  {!collapsedSections.projectInfo && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -944,19 +965,29 @@ const FDLEditor: React.FC = () => {
                       </p>
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* Camera & Canvas Setups */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => toggleSection('cameraSetups')}>
                     <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Camera & Canvas Setups</h2>
-                    <button
-                      onClick={addContext}
-                      className="fdl-button-primary text-sm"
-                    >
-                      Add Camera Setup
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addContext();
+                        }}
+                        className="fdl-button-primary text-sm"
+                      >
+                        Add Camera Setup
+                      </button>
+                      <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-xl">
+                        {collapsedSections.cameraSetups ? '▼' : '▲'}
+                      </button>
+                    </div>
                   </div>
+                  {!collapsedSections.cameraSetups && (
                   <div className="space-y-4">
                     {(fdl.contexts || []).map((context, contextIndex) => {
                       // Derive current manufacturer and model from cameraSelections state
@@ -1215,19 +1246,29 @@ const FDLEditor: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* Framelines */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => toggleSection('framelines')}>
                     <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Framelines</h2>
-                    <button
-                      onClick={addFramingIntent}
-                      className="fdl-button-primary text-sm"
-                    >
-                      Add Frameline
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addFramingIntent();
+                        }}
+                        className="fdl-button-primary text-sm"
+                      >
+                        Add Frameline
+                      </button>
+                      <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-xl">
+                        {collapsedSections.framelines ? '▼' : '▲'}
+                      </button>
+                    </div>
                   </div>
+                  {!collapsedSections.framelines && (
                   <div className="space-y-4">
                     {(fdl.framing_intents || []).map((intent, index) => {
                       return (
@@ -1542,6 +1583,7 @@ const FDLEditor: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* Visualizer Context Selector - Only show when there are multiple camera setups */}
@@ -1570,7 +1612,23 @@ const FDLEditor: React.FC = () => {
                 )}
 
                 {/* FDL Visualizer */}
-                <FDLVisualizer fdl={fdl} visualizedContextIndex={selectedVisualizedContextIndex} />
+                <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
+                  <div className="flex items-center justify-between mb-4 cursor-pointer" onClick={() => toggleSection('visualizer')}>
+                    <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Frame Line Preview</h2>
+                    <button className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-xl">
+                      {collapsedSections.visualizer ? '▼' : '▲'}
+                    </button>
+                  </div>
+                  {!collapsedSections.visualizer && (
+                    <div className="p-0 -m-6 mt-0">
+                      <FDLVisualizer 
+                        fdl={fdl} 
+                        visualizedContextIndex={selectedVisualizedContextIndex} 
+                        selectedCameraSelections={selectedCameraSelections}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Frame Leader Editor - New Section */}
                 {(fdl.contexts && fdl.contexts.length > 0 && selectedVisualizedContextIndex !== null) && (

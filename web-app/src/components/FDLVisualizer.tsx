@@ -12,20 +12,27 @@ import {
   type RoundingConfig
 } from '../utils/fdlGeometry';
 import { generateFDLId } from '../validation/fdlValidator';
-import { exportFDLFile, sanitizeFilename } from '../utils/fdlExport';
+import { sanitizeFilename } from '../utils/fdlExport';
 import { useFrameLeaderSettingsStore } from '../stores/frameLeaderSettingsStore';
 import { useFdlStore } from '../stores/fdlStore';
+
+interface CameraSelection {
+  manufacturer: string;
+  model: string;
+  resolutionName: string;
+}
 
 interface FDLVisualizerProps {
   fdl: FDL;
   visualizedContextIndex: number | null;
+  selectedCameraSelections?: CameraSelection[];
 }
 
-const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex }) => {
+const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex, selectedCameraSelections = [] }) => {
   const [showTechInfo, setShowTechInfo] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const { settings } = useFrameLeaderSettingsStore();
-  const { projectName } = useFdlStore();
+
   const [arriExportFilename, setArriExportFilename] = useState('framelines');
 
   const mainContainerStyle: React.CSSProperties = {
@@ -158,9 +165,13 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
   if (primaryCanvas && primaryCanvas.dimensions && visualizedContextIndex !== null) {
     const { width: canvasWidthPx, height: canvasHeightPx } = primaryCanvas.dimensions;
+    const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
 
     if (canvasWidthPx > 0 && canvasHeightPx > 0) {
-      const canvasAspectRatio = canvasWidthPx / canvasHeightPx;
+      // Calculate effective canvas dimensions for display (after anamorphic desqueeze)
+      const effectiveCanvasWidthPx = canvasWidthPx * anamorphicSqueeze;
+      const effectiveCanvasHeightPx = canvasHeightPx;
+      const canvasAspectRatio = effectiveCanvasWidthPx / effectiveCanvasHeightPx;
       
       let scaledCanvasWidth = svgViewportWidth * 0.95;
       let scaledCanvasHeight = scaledCanvasWidth / canvasAspectRatio;
@@ -170,7 +181,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         scaledCanvasWidth = scaledCanvasHeight * canvasAspectRatio;
       }
       
-      const overallScale = scaledCanvasWidth / canvasWidthPx;
+      // Scale based on effective canvas width to maintain proper proportions
+      const overallScale = scaledCanvasWidth / effectiveCanvasWidthPx;
 
       const canvasRectX = (svgViewportWidth - scaledCanvasWidth) / 2;
       const canvasRectY = (svgViewportHeight - scaledCanvasHeight) / 2;
@@ -199,8 +211,9 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
             if (!intent.aspect_ratio || intent.aspect_ratio.width <= 0 || intent.aspect_ratio.height <= 0) return null;
             
-            // Use enhanced calculation with rotation and offset support
+            // Use enhanced calculation with rotation, offset, and anamorphic support
             const contextRotation = activeContext?.rotation || 0;
+            const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
             const transformResult = calculateFrameDimensionsWithTransforms(
               canvasWidthPx,
               canvasHeightPx,
@@ -208,7 +221,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
               intent.aspect_ratio.height,
               contextRotation,
               intent.offset || { x: 0, y: 0 },
-              DEFAULT_ROUNDING
+              DEFAULT_ROUNDING,
+              anamorphicSqueeze
             );
             
             let displayIntentWidthPx = transformResult.dimensions.width;
@@ -309,6 +323,13 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     techInfoText += `Image Circle: ${imageCircle.mm}\n`;
     techInfoText += `\nRecording File Image Content: ${recordingFileImageContent}\n`;
     
+    // Add anamorphic info if present
+    if (primaryCanvas.anamorphic_squeeze && primaryCanvas.anamorphic_squeeze > 1.0) {
+      const effectiveWidth = Math.round(primaryCanvas.dimensions.width * primaryCanvas.anamorphic_squeeze);
+      techInfoText += `Anamorphic Squeeze: ${primaryCanvas.anamorphic_squeeze}x\n`;
+      techInfoText += `Effective Dimensions (Desqueezed): ${effectiveWidth} x ${primaryCanvas.dimensions.height} px\n`;
+    }
+    
     // Add camera rotation info if present
     if (activeContext?.rotation) {
       techInfoText += `\nCamera Rotation: ${getRotationLabel(activeContext.rotation)}\n`;
@@ -322,8 +343,9 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         const canvasWidth = primaryCanvas.dimensions?.width || 0;
         const canvasHeight = primaryCanvas.dimensions?.height || 0;
         
-        // Use enhanced calculation with rotation and offset support
+        // Use enhanced calculation with rotation, offset, and anamorphic support
         const contextRotation = activeContext?.rotation || 0;
+        const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
         const transformResult = calculateFrameDimensionsWithTransforms(
           canvasWidth,
           canvasHeight,
@@ -331,7 +353,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
           intent.aspect_ratio.height,
           contextRotation,
           intent.offset || { x: 0, y: 0 },
-          DEFAULT_ROUNDING
+          DEFAULT_ROUNDING,
+          anamorphicSqueeze
         );
         
         let displayWidth = transformResult.dimensions.width;
@@ -371,13 +394,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     }
   };
 
-  const handleExportFDL = () => {
-    if (!projectName.trim()) {
-      alert('Please enter a Project Name in the Project Information section before exporting.');
-      return;
-    }
-    exportFDLFile(fdl, projectName);
-  };
+
 
   const handleExportArriXML = () => {
     if (!primaryCanvas || visualizedContextIndex === null) {
@@ -685,6 +702,22 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
         <div style={techInfoSectionStyle}>
           <span style={techInfoLabelStyle}>Recording File Image Content:</span>
           <p style={techInfoValueStyle}>{recordingFileImageContent}</p>
+          {primaryCanvas.anamorphic_squeeze && primaryCanvas.anamorphic_squeeze > 1.0 && (
+            <>
+              <span style={techInfoLabelStyle}>Anamorphic Squeeze:</span>
+              <p style={techInfoValueStyle}>{primaryCanvas.anamorphic_squeeze}x</p>
+              <span style={techInfoLabelStyle}>Effective Dimensions (Desqueezed):</span>
+              <p style={techInfoValueStyle}>
+                {Math.round((primaryCanvas.dimensions?.width || 0) * primaryCanvas.anamorphic_squeeze)} x {primaryCanvas.dimensions?.height || 0} px
+              </p>
+            </>
+          )}
+          {activeContext?.rotation && (
+            <>
+              <span style={techInfoLabelStyle}>Camera Rotation:</span>
+              <p style={techInfoValueStyle}>{getRotationLabel(activeContext.rotation)}</p>
+            </>
+          )}
         </div>
         
         {(fdl.framing_intents || []).filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0).map((intent, index) => {
@@ -692,30 +725,35 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
           const canvasWidth = primaryCanvas.dimensions?.width || 0;
           const canvasHeight = primaryCanvas.dimensions?.height || 0;
           
-                     // Use precise calculation method with ASC FDL rounding
-           const frameDimensions = calculateExactFrameDimensions(
-             canvasWidth,
-             canvasHeight,
-             intent.aspect_ratio.width,
-             intent.aspect_ratio.height,
-             DEFAULT_ROUNDING
-           );
+          // Use enhanced calculation with rotation, offset, and anamorphic support
+          const contextRotation = activeContext?.rotation || 0;
+          const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+          const transformResult = calculateFrameDimensionsWithTransforms(
+            canvasWidth,
+            canvasHeight,
+            intent.aspect_ratio.width,
+            intent.aspect_ratio.height,
+            contextRotation,
+            intent.offset || { x: 0, y: 0 },
+            DEFAULT_ROUNDING,
+            anamorphicSqueeze
+          );
           
-          let displayWidth = frameDimensions.width;
-          let displayHeight = frameDimensions.height;
+          let displayWidth = transformResult.dimensions.width;
+          let displayHeight = transformResult.dimensions.height;
           
           if (intent.protection && intent.protection > 0 && intent.protection < 100) {
-                         const protectionResult = calculateFrameWithProtection(
-               frameDimensions.width,
-               frameDimensions.height,
-               intent.protection,
-               DEFAULT_ROUNDING
-             );
+            const protectionResult = calculateFrameWithProtection(
+              displayWidth,
+              displayHeight,
+              intent.protection,
+              DEFAULT_ROUNDING
+            );
             displayWidth = protectionResult.width;
             displayHeight = protectionResult.height;
           }
 
-          const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
+          const preciseAspectRatio = calculatePreciseAspectRatio(transformResult.effectiveAspectRatio.width, transformResult.effectiveAspectRatio.height);
 
           return (
             <div key={`tech-intent-${intent.id || index}`} style={{...techInfoSectionStyle, borderTop: '1px solid #333333', paddingTop: '0.75rem' }}>
@@ -725,7 +763,10 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
               </div>
               <p style={techInfoValueStyle}>Size: {displayWidth} x {displayHeight} px</p>
               <p style={techInfoValueStyle}>Aspect Ratio: {intent.aspect_ratio.width}:{intent.aspect_ratio.height} ({formatNumberForDisplay(preciseAspectRatio)}:1)</p>
-                              {intent.protection && <p style={techInfoValueStyle}>Extraction: {intent.protection}%</p>}
+              {intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0) && (
+                <p style={techInfoValueStyle}>Offset: {intent.offset.x}px, {intent.offset.y}px</p>
+              )}
+              {intent.protection && <p style={techInfoValueStyle}>Extraction: {intent.protection}%</p>}
             </div>
           );
         })}
@@ -757,71 +798,36 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
           Image Selection Bar (Placeholder)
         </div>
         
-        {/* Export Controls */}
-        <div className="w-full mt-4 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
-          <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3 text-center">Export Options</h4>
-          
-          {/* Export FDL Section */}
-          <div className="mb-4 pb-4 border-b border-gray-300 dark:border-gray-600">
-            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">ASC FDL Format</h5>
+        {/* Export Arri XML - Only show when Arri camera is selected */}
+        {selectedCameraSelections[visualizedContextIndex || 0]?.manufacturer?.toUpperCase() === 'ARRI' && (
+          <div className="w-full mt-4 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
+            <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3 text-center">Export Arri XML</h4>
             <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-end justify-center">
               <div className="w-full sm:w-1/2">
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 text-center">
+                <label htmlFor="arri-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 text-center">
                   Filename
                 </label>
-                <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm text-center">
-                  {projectName ? `${projectName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-')}.fdl` : 'Please set Project Name above'}
-                </div>
+                <input
+                  type="text"
+                  id="arri-export-filename"
+                  value={arriExportFilename}
+                  onChange={(e) => setArriExportFilename(e.target.value)}
+                  placeholder="framelines"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm text-center"
+                />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-center">
-                  Future-ready ASC specification format (<span className="font-mono">.fdl</span>)
+                  Camera-ready format for Arri cameras (<span className="font-mono">.xml</span>)
                 </p>
               </div>
               <button
-                onClick={handleExportFDL}
-                className={`text-sm px-4 py-2 whitespace-nowrap rounded-md font-medium transition-colors ${
-                  projectName.trim() 
-                    ? 'fdl-button-primary' 
-                    : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                }`}
-                disabled={!projectName.trim()}
-                title={!projectName.trim() ? 'Please enter a Project Name before exporting' : 'Export FDL file'}
+                onClick={handleExportArriXML}
+                className="fdl-button-secondary text-sm px-4 py-2 whitespace-nowrap"
               >
-                Export FDL
+                Export Arri XML
               </button>
             </div>
           </div>
-
-          {/* Export Arri XML Section - Only show when Arri camera is selected */}
-          {activeContext?.meta?.manufacturer === 'ARRI' && (
-            <div>
-              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">Arri XML Format</h5>
-              <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-end justify-center">
-                <div className="w-full sm:w-1/2">
-                  <label htmlFor="arri-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 text-center">
-                    Filename
-                  </label>
-                  <input
-                    type="text"
-                    id="arri-export-filename"
-                    value={arriExportFilename}
-                    onChange={(e) => setArriExportFilename(e.target.value)}
-                    placeholder="framelines"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm text-center"
-                  />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    Camera-ready format for Arri cameras (<span className="font-mono">.xml</span>)
-                  </p>
-                </div>
-                <button
-                  onClick={handleExportArriXML}
-                  className="fdl-button-secondary text-sm px-4 py-2 whitespace-nowrap"
-                >
-                  Export Arri XML
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
       
       {/* Floating Technical Information Panel */}

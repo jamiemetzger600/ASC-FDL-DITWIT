@@ -163,6 +163,20 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fdl.framing_intents, primaryCanvas]); // Depend on primaryCanvas to re-init visibility
 
+  // Auto-toggle anamorphic desqueeze in preview based on squeeze factor
+  useEffect(() => {
+    if (settings && primaryCanvas?.anamorphic_squeeze !== undefined) {
+      const squeeze = primaryCanvas.anamorphic_squeeze;
+      const shouldEnable = squeeze > 1.0;
+      const currentlyEnabled = settings.anamorphicDesqueezeInPreview;
+      
+      // Auto-enable when squeeze > 1.0, auto-disable when squeeze = 1.0
+      if (shouldEnable !== currentlyEnabled) {
+        updateSettings({ anamorphicDesqueezeInPreview: shouldEnable });
+      }
+    }
+  }, [primaryCanvas?.anamorphic_squeeze, settings, updateSettings]);
+
   // Effect to update exportFilename when settings.title.text changes, if not manually edited
   useEffect(() => {
     if (!isFilenameManuallyEdited && settings?.title?.text) {
@@ -332,15 +346,20 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   
   const getScaledCanvasDimensions = () => {
     if (!primaryCanvas || !primaryCanvas.dimensions) return null;
-    let canvasWidthPx = primaryCanvas.dimensions.width;
+    const originalCanvasWidthPx = primaryCanvas.dimensions.width;
     const canvasHeightPx = primaryCanvas.dimensions.height;
-    if (canvasWidthPx <= 0 || canvasHeightPx <= 0) return null;
+    if (originalCanvasWidthPx <= 0 || canvasHeightPx <= 0) return null;
 
-    if (settings.anamorphicDesqueezeInPreview && primaryCanvas.anamorphic_squeeze && primaryCanvas.anamorphic_squeeze > 1) {
-      canvasWidthPx *= primaryCanvas.anamorphic_squeeze;
+    // Calculate effective canvas dimensions for proper preview scaling
+    // When anamorphic desqueeze is enabled in preview, show the desqueezed proportions
+    const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+    let effectiveCanvasWidthPx = originalCanvasWidthPx;
+    
+    if (settings.anamorphicDesqueezeInPreview && anamorphicSqueeze > 1) {
+      effectiveCanvasWidthPx = originalCanvasWidthPx * anamorphicSqueeze;
     }
 
-    const canvasAspectRatio = canvasWidthPx / canvasHeightPx;
+    const canvasAspectRatio = effectiveCanvasWidthPx / canvasHeightPx;
     let scaledCanvasWidth = svgPreviewViewBoxWidth * 0.9; 
     let scaledCanvasHeight = scaledCanvasWidth / canvasAspectRatio;
 
@@ -351,11 +370,14 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     
     const canvasRectX = (svgPreviewViewBoxWidth - scaledCanvasWidth) / 2;
     const canvasRectY = (svgPreviewViewBoxHeight - scaledCanvasHeight) / 2;
-    const overallScale = scaledCanvasWidth / canvasWidthPx; 
+    
+    // Scale is based on effective canvas width to ensure proper frame positioning
+    const overallScale = scaledCanvasWidth / effectiveCanvasWidthPx; 
 
     return {
-      canvasWidthPx, 
+      canvasWidthPx: originalCanvasWidthPx, // Keep original for frame calculations
       canvasHeightPx, 
+      effectiveCanvasWidthPx, // New: effective width after desqueeze
       scaledCanvasWidth, 
       scaledCanvasHeight, 
       canvasRectX, 
@@ -394,9 +416,10 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
           const originalCanvasWidthPxForIntent = primaryCanvas.dimensions.width; 
           const originalCanvasHeightPxForIntent = primaryCanvas.dimensions.height;
           
-          // Use enhanced calculation with rotation and offset support  
+          // Use enhanced calculation with rotation, offset, and anamorphic support  
           const context = fdl.contexts?.[visualizedContextIndex || 0];
           const contextRotation = context?.rotation || 0;
+          const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
           const transformResult = calculateFrameDimensionsWithTransforms(
             originalCanvasWidthPxForIntent,
             originalCanvasHeightPxForIntent,
@@ -404,7 +427,8 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             intent.aspect_ratio.height,
             contextRotation,
             intent.offset || { x: 0, y: 0 },
-            DEFAULT_ROUNDING
+            DEFAULT_ROUNDING,
+            anamorphicSqueeze
           );
           
           let displayIntentWidthPx = transformResult.dimensions.width;
@@ -632,13 +656,18 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       if (settings.showFormatArrow && visibleValidIntents.length > 0) {
         visibleValidIntents.forEach((intent, index) => {
           if (intent.aspect_ratio) {
-            const frameDimensions = calculateExactFrameDimensions(
+            const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+            const transformResult = calculateFrameDimensionsWithTransforms(
               photositeDimensions.width,
               photositeDimensions.height,
               intent.aspect_ratio.width,
               intent.aspect_ratio.height,
-              DEFAULT_ROUNDING
+              0, // No rotation for camera info display
+              { x: 0, y: 0 }, // No offset for camera info display
+              DEFAULT_ROUNDING,
+              anamorphicSqueeze
             );
+            const frameDimensions = transformResult.dimensions;
             const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
             const cropPhysicalWidth = formatNumberForDisplay(frameDimensions.width * pixelPitch);
             const cropPhysicalHeight = formatNumberForDisplay(frameDimensions.height * pixelPitch);
@@ -740,14 +769,19 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       let leftYOffset = 0;
       visibleValidIntents.forEach((intent, index) => {
         if (intent.aspect_ratio) {
-          // Use precise calculation method with ASC FDL rounding
-          const frameDimensions = calculateExactFrameDimensions(
+          // Use precise calculation method with ASC FDL rounding and anamorphic support
+          const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+          const transformResult = calculateFrameDimensionsWithTransforms(
             photositeDimensions.width,
             photositeDimensions.height,
             intent.aspect_ratio.width,
             intent.aspect_ratio.height,
-            DEFAULT_ROUNDING
+            0, // No rotation for camera info display
+            { x: 0, y: 0 }, // No offset for camera info display
+            DEFAULT_ROUNDING,
+            anamorphicSqueeze
           );
+          const frameDimensions = transformResult.dimensions;
           
           const cropWidth = frameDimensions.width;
           const cropHeight = frameDimensions.height;
@@ -859,10 +893,14 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     const scaledDimensions = getScaledCanvasDimensions();
     if (!scaledDimensions) return null;
     
-    const overallScale = scaledDimensions.scaledCanvasWidth / canvasWidthPx;
-
-    const canvasRectX = (svgPreviewViewBoxWidth - scaledDimensions.scaledCanvasWidth) / 2;
-    const canvasRectY = (svgPreviewViewBoxHeight - scaledDimensions.scaledCanvasHeight) / 2;
+    // Use the same scale calculation as framelines (includes anamorphic desqueeze)
+    const {
+      scaledCanvasWidth,
+      scaledCanvasHeight,
+      canvasRectX,
+      canvasRectY,
+      overallScale
+    } = scaledDimensions;
 
     const elements: React.JSX.Element[] = [];
 
@@ -872,38 +910,53 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       const showArrowsForThisIntent = settings.intentArrowVisibility?.[intent.id] !== false;
       if (!showArrowsForThisIntent) return;
 
-      // Calculate frame dimensions using our precise mathematical tools
-      const photositeDimensions = canvas.photosite_dimensions || { width: canvasWidthPx, height: canvasHeightPx };
-      const frameDimensions = calculateExactFrameDimensions(
-        photositeDimensions.width,
-        photositeDimensions.height,
+      // Use the same anamorphic-aware calculation as framelines
+      const context = fdl.contexts?.[visualizedContextIndex || 0];
+      const contextRotation = context?.rotation || 0;
+      const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+      
+      const transformResult = calculateFrameDimensionsWithTransforms(
+        canvasWidthPx,
+        canvas.dimensions.height,
         intent.aspect_ratio.width,
         intent.aspect_ratio.height,
-        DEFAULT_ROUNDING
+        contextRotation,
+        intent.offset || { x: 0, y: 0 },
+        DEFAULT_ROUNDING,
+        anamorphicSqueeze
       );
 
       // Apply protection if specified
-      let displayWidth = frameDimensions.width;
-      let displayHeight = frameDimensions.height;
+      let displayWidth = transformResult.dimensions.width;
+      let displayHeight = transformResult.dimensions.height;
+      let anchorOffsetX = 0;
+      let anchorOffsetY = 0;
       
       if (intent.protection && intent.protection > 0 && intent.protection < 100) {
         const protectionResult = calculateFrameWithProtection(
-          frameDimensions.width,
-          frameDimensions.height,
+          transformResult.dimensions.width,
+          transformResult.dimensions.height,
           intent.protection,
           DEFAULT_ROUNDING
         );
         displayWidth = protectionResult.width;
         displayHeight = protectionResult.height;
+        anchorOffsetX = protectionResult.offsetX;
+        anchorOffsetY = protectionResult.offsetY;
       }
 
       // Scale the dimensions to the preview
       const scaledFrameWidth = displayWidth * overallScale;
       const scaledFrameHeight = displayHeight * overallScale;
 
-      // Calculate frame position (centered on canvas)
-      const frameX = canvasRectX + (scaledDimensions.scaledCanvasWidth - scaledFrameWidth) / 2;
-      const frameY = canvasRectY + (scaledDimensions.scaledCanvasHeight - scaledFrameHeight) / 2;
+      // Use the anchor point from the transform result (includes offset positioning and anamorphic)
+      const intentBaseAnchorXPx = transformResult.anchorPoint.x;
+      const intentBaseAnchorYPx = transformResult.anchorPoint.y;
+      const finalIntentAnchorXPx = intentBaseAnchorXPx + anchorOffsetX;
+      const finalIntentAnchorYPx = intentBaseAnchorYPx + anchorOffsetY;
+      
+      const frameX = canvasRectX + (finalIntentAnchorXPx * overallScale);
+      const frameY = canvasRectY + (finalIntentAnchorYPx * overallScale);
 
              // Arrow properties
        const arrowSize = 12;

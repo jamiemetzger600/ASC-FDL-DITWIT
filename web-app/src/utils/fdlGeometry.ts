@@ -265,8 +265,9 @@ export function calculateFramingDecisionGeometry(
 
   const canvasWidth = canvas.dimensions.width;
   const canvasHeight = canvas.dimensions.height;
+  const anamorphicSqueeze = canvas.anamorphic_squeeze || 1.0;
 
-  // Use enhanced calculation with rotation and offset support
+  // Use enhanced calculation with rotation, offset, and anamorphic support
   const transformResult = calculateFrameDimensionsWithTransforms(
     canvasWidth,
     canvasHeight,
@@ -274,7 +275,8 @@ export function calculateFramingDecisionGeometry(
     intent.aspect_ratio.height,
     contextRotation,
     intent.offset || { x: 0, y: 0 },
-    roundingConfig
+    roundingConfig,
+    anamorphicSqueeze
   );
 
   const decisionWidth = transformResult.dimensions.width;
@@ -388,7 +390,7 @@ export function calculateFrameWithOffset(
 }
 
 /**
- * Enhanced frame calculation with rotation and offset support
+ * Enhanced frame calculation with rotation, offset, and anamorphic desqueeze support
  */
 export function calculateFrameDimensionsWithTransforms(
   canvasWidth: number,
@@ -397,32 +399,39 @@ export function calculateFrameDimensionsWithTransforms(
   aspectRatioHeight: number,
   rotation: RotationAngle = 0,
   offset: FDLPoint = { x: 0, y: 0 },
-  roundingConfig: RoundingConfig = DEFAULT_ROUNDING
+  roundingConfig: RoundingConfig = DEFAULT_ROUNDING,
+  anamorphicSqueeze: number = 1.0
 ): {
   dimensions: { width: number; height: number };
   anchorPoint: FDLPoint;
   effectiveAspectRatio: { width: number; height: number };
   isValidOffset: boolean;
   clampedOffset: FDLPoint;
+  canvasDimensions: { width: number; height: number };
 } {
+  // Apply anamorphic desqueeze to canvas dimensions for calculations
+  // This represents the "effective" canvas after desqueeze
+  const effectiveCanvasWidth = Math.round(canvasWidth * anamorphicSqueeze);
+  const effectiveCanvasHeight = canvasHeight;
+
   // Apply rotation to aspect ratio first
   const rotatedAspectRatio = applyRotationToAspectRatio(aspectRatioWidth, aspectRatioHeight, rotation);
 
-  // Calculate frame dimensions based on rotated aspect ratio
+  // Calculate frame dimensions based on rotated aspect ratio and effective canvas
   const frameDimensions = calculateExactFrameDimensions(
-    canvasWidth,
-    canvasHeight,
+    effectiveCanvasWidth,
+    effectiveCanvasHeight,
     rotatedAspectRatio.width,
     rotatedAspectRatio.height,
     roundingConfig
   );
 
-  // Calculate position with offset
+  // Calculate position with offset on the effective canvas
   const positionResult = calculateFrameWithOffset(
     frameDimensions.width,
     frameDimensions.height,
-    canvasWidth,
-    canvasHeight,
+    effectiveCanvasWidth,
+    effectiveCanvasHeight,
     offset,
     roundingConfig
   );
@@ -432,7 +441,8 @@ export function calculateFrameDimensionsWithTransforms(
     anchorPoint: positionResult.anchorPoint,
     effectiveAspectRatio: rotatedAspectRatio,
     isValidOffset: positionResult.isValid,
-    clampedOffset: positionResult.clampedOffset
+    clampedOffset: positionResult.clampedOffset,
+    canvasDimensions: { width: effectiveCanvasWidth, height: effectiveCanvasHeight }
   };
 }
 
@@ -659,6 +669,34 @@ export function testCalculations() {
   console.log(`- Prevents artifacts when scaling/cropping`);
   console.log(`- Ensures consistent behavior across platforms`);
   console.log(`- Critical for anamorphic desqueeze operations`);
+  
+  // Anamorphic desqueeze test
+  console.log(`\n--- Anamorphic Desqueeze Test ---`);
+  const testCanvas = { width: 4096, height: 2160 };
+  const testAspectRatio = { width: 239, height: 100 }; // 2.39:1
+  const anamorphicFactors = [1.0, 1.33, 2.0];
+  
+  anamorphicFactors.forEach(squeeze => {
+    const result = calculateFrameDimensionsWithTransforms(
+      testCanvas.width,
+      testCanvas.height,
+      testAspectRatio.width,
+      testAspectRatio.height,
+      0,
+      { x: 0, y: 0 },
+      DEFAULT_ROUNDING,
+      squeeze
+    );
+    
+    const effectiveCanvasAspect = (testCanvas.width * squeeze) / testCanvas.height;
+    const frameFinalAspect = result.dimensions.width / result.dimensions.height;
+    
+    console.log(`Squeeze ${squeeze}x:`);
+    console.log(`  Effective Canvas: ${Math.round(testCanvas.width * squeeze)} x ${testCanvas.height} (${effectiveCanvasAspect.toFixed(3)}:1)`);
+    console.log(`  Frame: ${result.dimensions.width} x ${result.dimensions.height} (${frameFinalAspect.toFixed(3)}:1)`);
+    console.log(`  Expected Frame AR: ${(testAspectRatio.width / testAspectRatio.height).toFixed(3)}:1`);
+    console.log(`  AR Match: ${Math.abs(frameFinalAspect - (testAspectRatio.width / testAspectRatio.height)) < 0.01 ? '✓ PASS' : '✗ FAIL'}`);
+  });
   
   return {
     testsPassed: allTestsPassed,
