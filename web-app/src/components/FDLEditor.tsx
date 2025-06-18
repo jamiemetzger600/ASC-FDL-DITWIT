@@ -1244,7 +1244,7 @@ const FDLEditor: React.FC = () => {
                                     })()
                                   }}
                                 >
-                                  Intent {index + 1}
+                                  Frameline {index + 1}
                                 </span>
                               </h3>
                               <button 

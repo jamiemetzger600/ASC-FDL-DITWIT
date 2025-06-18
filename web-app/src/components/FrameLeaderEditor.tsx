@@ -1379,7 +1379,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
                             })()
                           }}
                         >
-                          {intent.label || `Intent ${idx + 1}`}
+                          {intent.label || `Frameline ${idx + 1}`}
                         </span>
                       </label>
                     </div>
