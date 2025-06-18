@@ -68,4 +68,25 @@
   .intent-label-5 {
     @apply bg-pink-500 dark:bg-pink-600 text-white px-2 py-1 rounded-md text-xs font-semibold;
   }
+
+  /* Custom slider styling */
+  .slider {
+    @apply appearance-none h-2 bg-gray-200 dark:bg-gray-600 rounded-lg cursor-pointer;
+  }
+  
+  .slider::-webkit-slider-thumb {
+    @apply appearance-none h-4 w-4 rounded-full bg-blue-500 dark:bg-blue-400 cursor-pointer;
+  }
+  
+  .slider::-moz-range-thumb {
+    @apply h-4 w-4 rounded-full bg-blue-500 dark:bg-blue-400 cursor-pointer border-0;
+  }
+  
+  .slider::-webkit-slider-thumb:hover {
+    @apply bg-blue-600 dark:bg-blue-300;
+  }
+  
+  .slider::-moz-range-thumb:hover {
+    @apply bg-blue-600 dark:bg-blue-300;
+  }
 }

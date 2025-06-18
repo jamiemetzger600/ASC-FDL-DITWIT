@@ -15,7 +15,7 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport, onReset }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectFileInputRef = useRef<HTMLInputElement>(null);
   const { settings, setSettings } = useFrameLeaderSettingsStore();
-  const { fdl, setFdl } = useFdlStore();
+  const { fdl, setFdl, projectName } = useFdlStore();
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -33,12 +33,17 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport, onReset }) => {
   };
 
   const handleExportProject = () => {
-    if (settings) {
-      const projectName = settings.title?.text || 'Untitled Project';
-      ProjectManager.exportProject(fdl, settings, projectName);
-    } else {
+    if (!settings) {
       alert('No project data to export!');
+      return;
     }
+    
+    if (!projectName.trim()) {
+      alert('Please enter a Project Name in the Project Information section before exporting.');
+      return;
+    }
+    
+    ProjectManager.exportProject(fdl, settings, projectName);
   };
 
   const handleImportProjectClick = () => {

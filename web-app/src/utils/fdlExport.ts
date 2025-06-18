@@ -1,12 +1,12 @@
 import type { FDL } from '../types/fdl';
-import { generateFDLId } from '../validation/fdlValidator';
+import { generateFDLId, generateUUID } from '../validation/fdlValidator';
 
 /**
  * Creates an ASC FDL compliant export structure with all required fields and proper formatting
  */
 export function createExportableFDL(fdl: FDL): FDL {
   return {
-    uuid: fdl.uuid || generateFDLId('fdl'),
+    uuid: fdl.uuid || generateUUID(),
     version: fdl.version || { major: 1, minor: 1 },
     ...(fdl.fdl_creator && { fdl_creator: fdl.fdl_creator }),
     // Automatically set the first framing intent as the default
@@ -19,13 +19,20 @@ export function createExportableFDL(fdl: FDL): FDL {
           width: intent.aspect_ratio.width,
           height: intent.aspect_ratio.height
         },
-        ...(intent.protection !== undefined && { protection: intent.protection })
+        ...(intent.protection !== undefined && { protection: intent.protection }),
+        ...(intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0) && { 
+          offset: { 
+            x: intent.offset.x, 
+            y: intent.offset.y 
+          } 
+        })
       }))
     }),
     ...(fdl.contexts && fdl.contexts.length > 0 && {
       contexts: fdl.contexts.map(context => ({
         ...(context.label && { label: context.label }),
         ...(context.context_creator && { context_creator: context.context_creator }),
+        ...(context.rotation !== undefined && context.rotation !== 0 && { rotation: context.rotation }),
         canvases: context.canvases.map(canvas => ({
           ...(canvas.label && { label: canvas.label }),
           id: canvas.id,

@@ -1,4 +1,4 @@
-import type { FramingIntent, Canvas, FramingDecision } from '../types/fdl';
+import type { FramingIntent, Canvas, FramingDecision, FDLPoint, RotationAngle } from '../types/fdl';
 
 /**
  * Core mathematical utilities for accurate FDL calculations
@@ -253,6 +253,7 @@ export function calculatePreciseAspectRatio(width: number, height: number): numb
 export function calculateFramingDecisionGeometry(
   intent: FramingIntent,
   canvas: Canvas,
+  contextRotation: RotationAngle = 0,
   roundingConfig: RoundingConfig = DEFAULT_ROUNDING
 ): Omit<FramingDecision, 'id' | 'label' | 'framing_intent_id'> | null {
   if (!canvas.dimensions || canvas.dimensions.width <= 0 || canvas.dimensions.height <= 0) {
@@ -265,28 +266,24 @@ export function calculateFramingDecisionGeometry(
   const canvasWidth = canvas.dimensions.width;
   const canvasHeight = canvas.dimensions.height;
 
-  // Use the new precise calculation method with rounding
-  const frameDimensions = calculateExactFrameDimensions(
+  // Use enhanced calculation with rotation and offset support
+  const transformResult = calculateFrameDimensionsWithTransforms(
     canvasWidth,
     canvasHeight,
     intent.aspect_ratio.width,
     intent.aspect_ratio.height,
+    contextRotation,
+    intent.offset || { x: 0, y: 0 },
     roundingConfig
   );
 
-  const decisionWidth = frameDimensions.width;
-  const decisionHeight = frameDimensions.height;
-  
-  // Apply rounding to anchor points as well
-  const anchorPoint = applyRoundingToDimensions(
-    (canvasWidth - decisionWidth) / 2,
-    (canvasHeight - decisionHeight) / 2,
-    roundingConfig
-  );
+  const decisionWidth = transformResult.dimensions.width;
+  const decisionHeight = transformResult.dimensions.height;
+  const anchorPoint = transformResult.anchorPoint;
 
   const geometry: Omit<FramingDecision, 'id' | 'label' | 'framing_intent_id'> = {
     dimensions: { width: decisionWidth, height: decisionHeight },
-    anchor_point: { x: anchorPoint.width, y: anchorPoint.height },
+    anchor_point: anchorPoint,
   };
 
   // Handle protection if defined
@@ -304,12 +301,211 @@ export function calculateFramingDecisionGeometry(
     };
     
     geometry.protection_anchor_point = {
-      x: anchorPoint.width + protectionResult.offsetX,
-      y: anchorPoint.height + protectionResult.offsetY,
+      x: anchorPoint.x + protectionResult.offsetX,
+      y: anchorPoint.y + protectionResult.offsetY,
     };
   }
 
   return geometry;
+}
+
+/**
+ * Apply rotation to aspect ratio dimensions
+ * For camera rotation (not frame rotation)
+ */
+export function applyRotationToAspectRatio(
+  aspectRatioWidth: number,
+  aspectRatioHeight: number,
+  rotation: RotationAngle = 0
+): { width: number; height: number } {
+  switch (rotation) {
+    case 90:
+    case -90:
+      // 90° rotation swaps width and height
+      return { width: aspectRatioHeight, height: aspectRatioWidth };
+    case 180:
+      // 180° rotation keeps same dimensions
+      return { width: aspectRatioWidth, height: aspectRatioHeight };
+    case 0:
+    default:
+      return { width: aspectRatioWidth, height: aspectRatioHeight };
+  }
+}
+
+/**
+ * Calculate frame position with offset, ensuring bounds checking
+ */
+export function calculateFrameWithOffset(
+  frameWidth: number,
+  frameHeight: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  offset: FDLPoint = { x: 0, y: 0 },
+  roundingConfig: RoundingConfig = DEFAULT_ROUNDING
+): {
+  anchorPoint: FDLPoint;
+  isValid: boolean;
+  clampedOffset: FDLPoint;
+} {
+  // Default centered position
+  const centeredX = (canvasWidth - frameWidth) / 2;
+  const centeredY = (canvasHeight - frameHeight) / 2;
+
+  // Apply user offset to centered position
+  let targetX = centeredX + offset.x;
+  let targetY = centeredY + offset.y;
+
+  // Bounds checking - ensure frame doesn't go outside canvas
+  const minX = 0;
+  const minY = 0;
+  const maxX = canvasWidth - frameWidth;
+  const maxY = canvasHeight - frameHeight;
+
+  // Clamp to valid bounds
+  const clampedX = Math.max(minX, Math.min(maxX, targetX));
+  const clampedY = Math.max(minY, Math.min(maxY, targetY));
+
+  // Apply rounding to anchor points
+  const anchorPoint: FDLPoint = {
+    x: applyASCRounding(clampedX, roundingConfig),
+    y: applyASCRounding(clampedY, roundingConfig)
+  };
+
+  // Calculate if offset was clamped (user requested offset outside bounds)
+  const clampedOffset: FDLPoint = {
+    x: anchorPoint.x - centeredX,
+    y: anchorPoint.y - centeredY
+  };
+
+  const isValid = Math.abs(clampedOffset.x - offset.x) < 1 && 
+                  Math.abs(clampedOffset.y - offset.y) < 1;
+
+  return {
+    anchorPoint,
+    isValid,
+    clampedOffset
+  };
+}
+
+/**
+ * Enhanced frame calculation with rotation and offset support
+ */
+export function calculateFrameDimensionsWithTransforms(
+  canvasWidth: number,
+  canvasHeight: number,
+  aspectRatioWidth: number,
+  aspectRatioHeight: number,
+  rotation: RotationAngle = 0,
+  offset: FDLPoint = { x: 0, y: 0 },
+  roundingConfig: RoundingConfig = DEFAULT_ROUNDING
+): {
+  dimensions: { width: number; height: number };
+  anchorPoint: FDLPoint;
+  effectiveAspectRatio: { width: number; height: number };
+  isValidOffset: boolean;
+  clampedOffset: FDLPoint;
+} {
+  // Apply rotation to aspect ratio first
+  const rotatedAspectRatio = applyRotationToAspectRatio(aspectRatioWidth, aspectRatioHeight, rotation);
+
+  // Calculate frame dimensions based on rotated aspect ratio
+  const frameDimensions = calculateExactFrameDimensions(
+    canvasWidth,
+    canvasHeight,
+    rotatedAspectRatio.width,
+    rotatedAspectRatio.height,
+    roundingConfig
+  );
+
+  // Calculate position with offset
+  const positionResult = calculateFrameWithOffset(
+    frameDimensions.width,
+    frameDimensions.height,
+    canvasWidth,
+    canvasHeight,
+    offset,
+    roundingConfig
+  );
+
+  return {
+    dimensions: frameDimensions,
+    anchorPoint: positionResult.anchorPoint,
+    effectiveAspectRatio: rotatedAspectRatio,
+    isValidOffset: positionResult.isValid,
+    clampedOffset: positionResult.clampedOffset
+  };
+}
+
+/**
+ * Validate offset bounds for UI feedback
+ */
+export function validateOffset(
+  frameWidth: number,
+  frameHeight: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  offset: FDLPoint
+): {
+  isValid: boolean;
+  maxOffset: FDLPoint;
+  minOffset: FDLPoint;
+  errors: string[];
+} {
+  const errors: string[] = [];
+  
+  // Calculate maximum allowed offsets
+  const centeredX = (canvasWidth - frameWidth) / 2;
+  const centeredY = (canvasHeight - frameHeight) / 2;
+  
+  const maxOffsetX = centeredX;
+  const minOffsetX = -centeredX;
+  const maxOffsetY = centeredY;
+  const minOffsetY = -centeredY;
+
+  // Check bounds
+  let isValid = true;
+
+  if (offset.x > maxOffsetX) {
+    errors.push(`X offset too large (max: ${Math.round(maxOffsetX)}px)`);
+    isValid = false;
+  }
+  if (offset.x < minOffsetX) {
+    errors.push(`X offset too small (min: ${Math.round(minOffsetX)}px)`);
+    isValid = false;
+  }
+  if (offset.y > maxOffsetY) {
+    errors.push(`Y offset too large (max: ${Math.round(maxOffsetY)}px)`);
+    isValid = false;
+  }
+  if (offset.y < minOffsetY) {
+    errors.push(`Y offset too small (min: ${Math.round(minOffsetY)}px)`);
+    isValid = false;
+  }
+
+  return {
+    isValid,
+    maxOffset: { x: maxOffsetX, y: maxOffsetY },
+    minOffset: { x: minOffsetX, y: minOffsetY },
+    errors
+  };
+}
+
+/**
+ * Get rotation display label for UI
+ */
+export function getRotationLabel(rotation: RotationAngle = 0): string {
+  switch (rotation) {
+    case 0:
+      return 'No Rotation (0°)';
+    case 90:
+      return '90° Clockwise';
+    case -90:
+      return '90° Counter-clockwise';
+    case 180:
+      return '180° (Upside Down)';
+    default:
+      return 'No Rotation (0°)';
+  }
 }
 
 /**

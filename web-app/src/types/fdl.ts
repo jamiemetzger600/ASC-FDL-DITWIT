@@ -16,11 +16,14 @@ export interface FDLVersion {
   minor: 1;
 }
 
+export type RotationAngle = 0 | 90 | -90 | 180;
+
 export interface FramingIntent {
   id: string;
   label?: string;
   aspect_ratio: FDLDimensions;
   protection?: number;
+  offset?: FDLPoint;  // X/Y offset in pixels from center
 }
 
 export interface FramingDecision {
@@ -50,6 +53,7 @@ export interface Canvas {
 export interface Context {
   label?: string;
   context_creator?: string;
+  rotation?: RotationAngle;  // Physical camera rotation: 0°, 90° (CW), -90° (CCW), 180°
   canvases: Canvas[];
   meta?: {
     manufacturer?: string;

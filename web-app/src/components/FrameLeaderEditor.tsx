@@ -10,6 +10,7 @@ import {
   calculatePreciseAspectRatio,
   formatNumberForDisplay,
   calculateSensorInfo,
+  calculateFrameDimensionsWithTransforms,
   DEFAULT_ROUNDING,
   type RoundingConfig
 } from '../utils/fdlGeometry'; // Import the functions
@@ -206,7 +207,9 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
       if (!currentFramingDecisions.some(fd => fd.framing_intent_id === intentId)) {
         const intent = fdl.framing_intents?.find(fi => fi.id === intentId);
         if (intent) {
-          const geometry = calculateFramingDecisionGeometry(intent, primaryCanvas);
+          const context = fdl.contexts?.[visualizedContextIndex || 0];
+          const contextRotation = context?.rotation || 0;
+          const geometry = calculateFramingDecisionGeometry(intent, primaryCanvas, contextRotation);
           if (geometry) {
             const newDecision: FramingDecision = {
               id: generateFDLId(intent.label || `decision_${intentId}`),
@@ -391,24 +394,28 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
           const originalCanvasWidthPxForIntent = primaryCanvas.dimensions.width; 
           const originalCanvasHeightPxForIntent = primaryCanvas.dimensions.height;
           
-          // Use precise calculation method with ASC FDL rounding
-          const frameDimensions = calculateExactFrameDimensions(
+          // Use enhanced calculation with rotation and offset support  
+          const context = fdl.contexts?.[visualizedContextIndex || 0];
+          const contextRotation = context?.rotation || 0;
+          const transformResult = calculateFrameDimensionsWithTransforms(
             originalCanvasWidthPxForIntent,
             originalCanvasHeightPxForIntent,
             intent.aspect_ratio.width,
             intent.aspect_ratio.height,
+            contextRotation,
+            intent.offset || { x: 0, y: 0 },
             DEFAULT_ROUNDING
           );
           
-          let displayIntentWidthPx = frameDimensions.width;
-          let displayIntentHeightPx = frameDimensions.height;
+          let displayIntentWidthPx = transformResult.dimensions.width;
+          let displayIntentHeightPx = transformResult.dimensions.height;
           let anchorOffsetX = 0; 
           let anchorOffsetY = 0;
           
           if (intent.protection && intent.protection > 0 && intent.protection < 100) {
             const protectionResult = calculateFrameWithProtection(
-              frameDimensions.width,
-              frameDimensions.height,
+              transformResult.dimensions.width,
+              transformResult.dimensions.height,
               intent.protection,
               DEFAULT_ROUNDING
             );
@@ -418,8 +425,9 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             anchorOffsetY = protectionResult.offsetY;
           }
           
-          const intentBaseAnchorXPx = (originalCanvasWidthPxForIntent - frameDimensions.width) / 2;
-          const intentBaseAnchorYPx = (originalCanvasHeightPxForIntent - frameDimensions.height) / 2;
+          // Use the anchor point from the transform result (includes offset positioning)
+          const intentBaseAnchorXPx = transformResult.anchorPoint.x;
+          const intentBaseAnchorYPx = transformResult.anchorPoint.y;
           const finalIntentAnchorXPx = intentBaseAnchorXPx + anchorOffsetX;
           const finalIntentAnchorYPx = intentBaseAnchorYPx + anchorOffsetY;
           const scaledIntentWidth = displayIntentWidthPx * overallScale;
@@ -551,6 +559,16 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
         settings.intentVisibility[intent.id]
       );
 
+    // Check if any camera information should actually be displayed
+    const hasPixelDimensions = settings.showPixelDimensions;
+    const hasSensorDimensions = settings.showSensorDimensions;
+    const hasFramingIntents = settings.showFormatArrow && visibleValidIntents.length > 0;
+    
+    // If no sub-options are enabled, don't show the box at all
+    if (!hasPixelDimensions && !hasSensorDimensions && !hasFramingIntents) {
+      return null;
+    }
+
     const cameraName = canvas.label || canvas.source_canvas_id || 'Camera';
     const width = dimensions.width;
     const height = dimensions.height;
@@ -681,14 +699,18 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     
     // Right column - Source information
     let rightYOffset = 0;
-    elements.push(
-      <text key="source-compact" x={rightColumnX} y={baseY + rightYOffset + compactLineHeight} 
-            fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
-        <tspan fill="gray" fontSize={labelFontSize}>Source: </tspan>
-        {`${captureResolution} 17:9 Full Frame`}
-      </text>
-    );
-    rightYOffset += compactLineHeight + 2;
+    
+    // Always show the actual source resolution if we're displaying any camera info
+    if (hasPixelDimensions || hasSensorDimensions || hasFramingIntents) {
+      elements.push(
+        <text key="source-compact" x={rightColumnX} y={baseY + rightYOffset + compactLineHeight} 
+              fontSize={compactFontSize} fontFamily={PREDEFINED_FONTS[0].family} fill="black" textAnchor="start">
+          <tspan fill="gray" fontSize={labelFontSize}>Source: </tspan>
+          {`${photositeDimensions.width}x${photositeDimensions.height} px`}
+        </text>
+              );
+      rightYOffset += compactLineHeight + 2;
+    }
     
     // Canvas pixel dimensions (compact)
     if (settings.showPixelDimensions) {

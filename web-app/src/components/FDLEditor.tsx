@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { FDL, FramingIntent, Context, Canvas, FramingDecision } from '../types/fdl';
-import { generateFDLId } from '../validation/fdlValidator';
+import { generateFDLId, generateUUID } from '../validation/fdlValidator';
 import { COMMON_ASPECT_RATIOS } from '../types/fdl';
+import type { RotationAngle } from '../types/fdl';
+import { getRotationLabel, calculateFrameDimensionsWithTransforms, validateOffset, DEFAULT_ROUNDING } from '../utils/fdlGeometry';
 import FDLVisualizer from './FDLVisualizer';
 import FrameLeaderEditor from './FrameLeaderEditor';
 import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry';
@@ -343,7 +345,8 @@ const intentColors = ["#f87171", "#60a5fa", "#fbbf24", "#34d399", "#a78bfa", "#f
 const intentBackgroundOpacity = '40'; // Approx 25% opacity (hex 40)
 
 const FDLEditor: React.FC = () => {
-  const { fdl, setFdl } = useFdlStore();
+  const { fdl, setFdl, projectName, setProjectName } = useFdlStore();
+  const { settings, updateSettings } = useFrameLeaderSettingsStore();
   const [selectedVisualizedContextIndex, setSelectedVisualizedContextIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -351,8 +354,13 @@ const FDLEditor: React.FC = () => {
   }, [fdl.contexts]);
 
   const handleExport = () => {
-    // Use the shared export function for consistency
-    exportFDLFile(fdl);
+    // Use the separate project name field
+    if (!projectName.trim()) {
+      alert('Please enter a Project Name in the Project Information section before exporting.');
+      return;
+    }
+    // Use the shared export function with the standardized project name
+    exportFDLFile(fdl, projectName);
   };
 
   const handleImport = (file: File) => {
@@ -365,7 +373,7 @@ const FDLEditor: React.FC = () => {
         // Ensure imported FDL has required fields
         const validatedFdl: FDL = {
           ...importedFdl,
-          uuid: importedFdl.uuid || generateFDLId('fdl'),
+          uuid: importedFdl.uuid || generateUUID(),
           version: importedFdl.version || { major: 1, minor: 1 },
           framing_intents: importedFdl.framing_intents || [],
           contexts: importedFdl.contexts || [],
@@ -384,7 +392,7 @@ const FDLEditor: React.FC = () => {
   const handleReset = () => {
     // Reset FDL to initial state
     const initialFdl: FDL = {
-      uuid: generateFDLId('fdl'),
+      uuid: generateUUID(),
       version: { major: 1, minor: 1 },
       fdl_creator: 'ASC-DIT-FDL',
       framing_intents: [],
@@ -430,7 +438,7 @@ const FDLEditor: React.FC = () => {
     const updatedFdl = { ...fdl, ...newFdl };
     // Ensure UUID always exists
     if (!updatedFdl.uuid) {
-      updatedFdl.uuid = generateFDLId('fdl');
+      updatedFdl.uuid = generateUUID();
     }
     // Ensure version always exists
     if (!updatedFdl.version) {
@@ -561,7 +569,8 @@ const FDLEditor: React.FC = () => {
       const primaryCanvas = targetContext.canvases[0];
 
       if (primaryCanvas) {
-        const geometry = calculateFramingDecisionGeometry(newIntent, primaryCanvas);
+        const contextRotation = (fdl.contexts && fdl.contexts[selectedVisualizedContextIndex])?.rotation || 0;
+        const geometry = calculateFramingDecisionGeometry(newIntent, primaryCanvas, contextRotation);
         if (geometry) {
           const newDecision: FramingDecision = {
             id: generateFDLId(newIntent.label || `decision_${newIntent.id}`),
@@ -611,7 +620,8 @@ const FDLEditor: React.FC = () => {
         );
 
         if (decisionIndex !== -1) {
-          const geometry = calculateFramingDecisionGeometry(updatedIntent, primaryCanvas);
+          const contextRotation = targetContext?.rotation || 0;
+          const geometry = calculateFramingDecisionGeometry(updatedIntent, primaryCanvas, contextRotation);
           if (geometry) {
             primaryCanvas.framing_decisions[decisionIndex] = {
               ...primaryCanvas.framing_decisions[decisionIndex], // Keep other fields if any
@@ -894,30 +904,45 @@ const FDLEditor: React.FC = () => {
       <Header onExport={handleExport} onImport={handleImport} onReset={handleReset} />
       <div className="p-6">
         <div className="space-y-8">
-                <div className="text-gray-700 dark:text-gray-300 bg-blue-100 dark:bg-blue-900 border border-blue-300 dark:border-blue-700 rounded-md p-4">
-                  <p>
-                    Thanks for checking out my ASC-FDL creation tool. FDL stands for Frameline Decision List and will be similar to CDL but with photoshop style layer controls. The ASC comittee is still working on definining the release SPEC for FDL - so this tool is extremely ALPHA. As far as I know, FDL is only supported in colorfront as of now. Software companies and Camera companies should support FDL once the spec is final. For the meantime, I will continue to build this app so it's ready to go once the SPEC is live. I'll add backwards compatibility as well so you can use it to generate regular frameline files for Arri/Red/Sony. Please play around and test this. Please send me ideas and feedback. I'm pretty quick to respond - I want this tool to be great. <a href="mailto:jamiemetzger@gmail.com" className="text-blue-600 hover:underline">jamiemetzger@gmail.com</a>
-                  </p>
-                </div>
+                {/* Banner temporarily hidden */}
 
                 {/* FDL Metadata */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
-                  <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">FDL Creator Information</h2>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      FDL Creator
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">(Your name, email, and phone for contact)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={fdl.fdl_creator || ''}
-                      onChange={(e) => updateFDL({ fdl_creator: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., John Doe - john@example.com - (555) 123-4567"
-                    />
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      This information helps others contact you if there are questions about this FDL.
-                    </p>
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Project Information</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Project Name
+                        <span className="text-red-500 ml-1">*</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">(Used for all exports)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., No Country for Old Men, Commercial Spot, etc."
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        This name will be used for all FDL, frame leader, and project exports.
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        FDL Creator
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">(Your name, email, and phone for contact)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={fdl.fdl_creator || ''}
+                        onChange={(e) => updateFDL({ fdl_creator: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., John Doe - john@example.com - (555) 123-4567"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        This information helps others contact you if there are questions about this FDL.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -1000,7 +1025,7 @@ const FDLEditor: React.FC = () => {
                           </div>
 
                           {/* New Row for Anamorphic Squeeze and Recording Codec */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3"> {/* Added mt-3 for spacing */}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3"> {/* Added mt-3 for spacing */}
                             <div>
                               <label htmlFor={`anamorphic-squeeze-${contextIndex}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Anamorphic Squeeze</label>
                               <select
@@ -1017,6 +1042,29 @@ const FDLEditor: React.FC = () => {
                                   <option key={val} value={val}>{val.toFixed(2)}</option>
                                 ))}
                               </select>
+                            </div>
+                            <div>
+                              <label htmlFor={`camera-rotation-${contextIndex}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Canvas Rotation</label>
+                              <select
+                                id={`camera-rotation-${contextIndex}`}
+                                value={context.rotation || 0}
+                                onChange={(e) => {
+                                  const newContexts = [...(fdl.contexts || [])];
+                                  if(newContexts[contextIndex]) {
+                                      newContexts[contextIndex] = {...newContexts[contextIndex], rotation: Number(e.target.value) as RotationAngle };
+                                      updateFDL({contexts: newContexts});
+                                  }
+                                }}
+                                className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value={0}>{getRotationLabel(0)}</option>
+                                <option value={90}>{getRotationLabel(90)}</option>
+                                <option value={-90}>{getRotationLabel(-90)}</option>
+                                <option value={180}>{getRotationLabel(180)}</option>
+                              </select>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Physical camera orientation
+                              </p>
                             </div>
                             {currentSelection.manufacturer === 'ARRI' && ( // Use cameraSelections for conditional rendering
                               <div>
@@ -1269,7 +1317,7 @@ const FDLEditor: React.FC = () => {
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                ID
+                                ID (Internal Use)
                               </label>
                               <input
                                 type="text"
@@ -1281,7 +1329,7 @@ const FDLEditor: React.FC = () => {
                           </div>
 
                           {/* Second Row for Protection, Width, Height */}
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Protection (%)
@@ -1325,6 +1373,168 @@ const FDLEditor: React.FC = () => {
                               />
                             </div>
                           </div>
+
+                          {/* Third Row for Offset */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {(() => {
+                              // Calculate offset bounds for this intent
+                              const contextRotation = (fdl.contexts && fdl.contexts[selectedVisualizedContextIndex || 0])?.rotation || 0;
+                              const primaryCanvas = (fdl.contexts && fdl.contexts[selectedVisualizedContextIndex || 0])?.canvases?.[0];
+                              
+                              if (!primaryCanvas?.dimensions) {
+                                return (
+                                  <>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        X Offset (px)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={intent.offset?.x || 0}
+                                        onChange={(e) => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: Number(e.target.value), 
+                                            y: intent.offset?.y || 0 
+                                          }
+                                        })}
+                                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0 (centered)"
+                                      />
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Canvas needed for bounds
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Y Offset (px)
+                                      </label>
+                                      <input
+                                        type="number"
+                                        value={intent.offset?.y || 0}
+                                        onChange={(e) => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: intent.offset?.x || 0, 
+                                            y: Number(e.target.value) 
+                                          }
+                                        })}
+                                        className="w-full px-3 py-2 border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0 (centered)"
+                                      />
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Canvas needed for bounds
+                                      </p>
+                                    </div>
+                                  </>
+                                );
+                              }
+
+                              const transformResult = calculateFrameDimensionsWithTransforms(
+                                primaryCanvas.dimensions.width,
+                                primaryCanvas.dimensions.height,
+                                intent.aspect_ratio.width,
+                                intent.aspect_ratio.height,
+                                contextRotation,
+                                { x: 0, y: 0 }, // Use center for bounds calculation
+                                DEFAULT_ROUNDING
+                              );
+
+                              const bounds = validateOffset(
+                                transformResult.dimensions.width,
+                                transformResult.dimensions.height,
+                                primaryCanvas.dimensions.width,
+                                primaryCanvas.dimensions.height,
+                                { x: 0, y: 0 }
+                              );
+
+                              const currentXOffset = intent.offset?.x || 0;
+                              const currentYOffset = intent.offset?.y || 0;
+
+                              return (
+                                <>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                      X Offset (px)
+                                    </label>
+                                    <div className="space-y-2">
+                                      <input
+                                        type="range"
+                                        min={Math.round(bounds.minOffset.x)}
+                                        max={Math.round(bounds.maxOffset.x)}
+                                        value={currentXOffset}
+                                        onChange={(e) => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: Number(e.target.value), 
+                                            y: currentYOffset 
+                                          }
+                                        })}
+                                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                                      />
+                                      <input
+                                        type="number"
+                                        value={currentXOffset}
+                                        min={Math.round(bounds.minOffset.x)}
+                                        max={Math.round(bounds.maxOffset.x)}
+                                        onChange={(e) => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: Number(e.target.value), 
+                                            y: currentYOffset 
+                                          }
+                                        })}
+                                        className="w-full px-3 py-1 text-sm border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      />
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      Range: {Math.round(bounds.minOffset.x)} to {Math.round(bounds.maxOffset.x)}px
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                      Y Offset (px)
+                                    </label>
+                                    <div className="space-y-2">
+                                      <input
+                                        type="range"
+                                        min={Math.round(bounds.minOffset.y)}
+                                        max={Math.round(bounds.maxOffset.y)}
+                                        value={currentYOffset}
+                                        onChange={(e) => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: currentXOffset, 
+                                            y: Number(e.target.value) 
+                                          }
+                                        })}
+                                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                                      />
+                                      <input
+                                        type="number"
+                                        value={currentYOffset}
+                                        min={Math.round(bounds.minOffset.y)}
+                                        max={Math.round(bounds.maxOffset.y)}
+                                        onChange={(e) => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: currentXOffset, 
+                                            y: Number(e.target.value) 
+                                          }
+                                        })}
+                                        className="w-full px-3 py-1 text-sm border border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      />
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      Range: {Math.round(bounds.minOffset.y)} to {Math.round(bounds.maxOffset.y)}px
+                                    </p>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                          
+                          {/* Helper text for offsets */}
+                          <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              <strong>Offsets:</strong> Move the frame position on the canvas. Positive X = right, Positive Y = down. 
+                              Values are automatically clamped to keep frames within canvas bounds.
+                            </p>
+                          </div>
                         </div>
                       );
                     })}
@@ -1344,8 +1554,8 @@ const FDLEditor: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Visualizer Context Selector - Placed above the visualizer */}
-                {(fdl.contexts && fdl.contexts.length > 0) && (
+                {/* Visualizer Context Selector - Only show when there are multiple camera setups */}
+                {(fdl.contexts && fdl.contexts.length > 1) && (
                   <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-4 mb-6">
                     <label htmlFor="visualized-context-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Select Camera Setup to Visualize:

@@ -6,11 +6,15 @@ import {
   calculateSensorInfo,
   formatNumberForDisplay,
   calculatePreciseAspectRatio,
+  calculateFrameDimensionsWithTransforms,
+  getRotationLabel,
   DEFAULT_ROUNDING,
   type RoundingConfig
 } from '../utils/fdlGeometry';
 import { generateFDLId } from '../validation/fdlValidator';
 import { exportFDLFile, sanitizeFilename } from '../utils/fdlExport';
+import { useFrameLeaderSettingsStore } from '../stores/frameLeaderSettingsStore';
+import { useFdlStore } from '../stores/fdlStore';
 
 interface FDLVisualizerProps {
   fdl: FDL;
@@ -20,7 +24,8 @@ interface FDLVisualizerProps {
 const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex }) => {
   const [showTechInfo, setShowTechInfo] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [fdlExportFilename, setFdlExportFilename] = useState('framing-decision-list');
+  const { settings } = useFrameLeaderSettingsStore();
+  const { projectName } = useFdlStore();
   const [arriExportFilename, setArriExportFilename] = useState('framelines');
 
   const mainContainerStyle: React.CSSProperties = {
@@ -194,39 +199,37 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
             if (!intent.aspect_ratio || intent.aspect_ratio.width <= 0 || intent.aspect_ratio.height <= 0) return null;
             
-            // Use precise calculation method with ASC FDL rounding
-            const frameDimensions = calculateExactFrameDimensions(
+            // Use enhanced calculation with rotation and offset support
+            const contextRotation = activeContext?.rotation || 0;
+            const transformResult = calculateFrameDimensionsWithTransforms(
               canvasWidthPx,
               canvasHeightPx,
               intent.aspect_ratio.width,
               intent.aspect_ratio.height,
+              contextRotation,
+              intent.offset || { x: 0, y: 0 },
               DEFAULT_ROUNDING
             );
             
-            let displayIntentWidthPx = frameDimensions.width;
-            let displayIntentHeightPx = frameDimensions.height;
-            let anchorOffsetX = 0;
-            let anchorOffsetY = 0;
+            let displayIntentWidthPx = transformResult.dimensions.width;
+            let displayIntentHeightPx = transformResult.dimensions.height;
+            let finalIntentAnchorXPx = transformResult.anchorPoint.x;
+            let finalIntentAnchorYPx = transformResult.anchorPoint.y;
 
+            // Apply protection if present
             if (intent.protection && intent.protection > 0 && intent.protection < 100) {
               const protectionResult = calculateFrameWithProtection(
-                frameDimensions.width,
-                frameDimensions.height,
+                displayIntentWidthPx,
+                displayIntentHeightPx,
                 intent.protection,
                 DEFAULT_ROUNDING
               );
 
               displayIntentWidthPx = protectionResult.width;
               displayIntentHeightPx = protectionResult.height;
-              anchorOffsetX = protectionResult.offsetX;
-              anchorOffsetY = protectionResult.offsetY;
+              finalIntentAnchorXPx += protectionResult.offsetX;
+              finalIntentAnchorYPx += protectionResult.offsetY;
             }
-
-            const intentBaseAnchorXPx = (canvasWidthPx - frameDimensions.width) / 2;
-            const intentBaseAnchorYPx = (canvasHeightPx - frameDimensions.height) / 2;
-            
-            const finalIntentAnchorXPx = intentBaseAnchorXPx + anchorOffsetX;
-            const finalIntentAnchorYPx = intentBaseAnchorYPx + anchorOffsetY;
 
             const scaledIntentWidth = displayIntentWidthPx * overallScale;
             const scaledIntentHeight = displayIntentHeightPx * overallScale;
@@ -254,7 +257,9 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
                   textAnchor="end"
                   style={{ pointerEvents: 'none', fontWeight: 'bold' }}
                 >
-                  {intent.label || intent.id}{intent.protection ? ` (${intent.protection}% prot.)` : ''}
+                  {intent.label || intent.id}
+                  {contextRotation ? ` (${getRotationLabel(contextRotation).replace('No Rotation (0°)', '').replace('°', '°')})` : ''}
+                  {intent.protection ? ` (${intent.protection}% prot.)` : ''}
                 </text>
               </g>
             );
@@ -303,6 +308,11 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     techInfoText += `Photosite Count: ${sensorActiveImageArea.photositeCount}\n`;
     techInfoText += `Image Circle: ${imageCircle.mm}\n`;
     techInfoText += `\nRecording File Image Content: ${recordingFileImageContent}\n`;
+    
+    // Add camera rotation info if present
+    if (activeContext?.rotation) {
+      techInfoText += `\nCamera Rotation: ${getRotationLabel(activeContext.rotation)}\n`;
+    }
 
     const validIntents = (fdl.framing_intents || []).filter(intent => intent.aspect_ratio && intent.aspect_ratio.width > 0 && intent.aspect_ratio.height > 0);
     
@@ -312,22 +322,25 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         const canvasWidth = primaryCanvas.dimensions?.width || 0;
         const canvasHeight = primaryCanvas.dimensions?.height || 0;
         
-        // Use precise calculation method with ASC FDL rounding
-        const frameDimensions = calculateExactFrameDimensions(
+        // Use enhanced calculation with rotation and offset support
+        const contextRotation = activeContext?.rotation || 0;
+        const transformResult = calculateFrameDimensionsWithTransforms(
           canvasWidth,
           canvasHeight,
           intent.aspect_ratio.width,
           intent.aspect_ratio.height,
+          contextRotation,
+          intent.offset || { x: 0, y: 0 },
           DEFAULT_ROUNDING
         );
         
-        let displayWidth = frameDimensions.width;
-        let displayHeight = frameDimensions.height;
+        let displayWidth = transformResult.dimensions.width;
+        let displayHeight = transformResult.dimensions.height;
         
         if (intent.protection && intent.protection > 0 && intent.protection < 100) {
           const protectionResult = calculateFrameWithProtection(
-            frameDimensions.width,
-            frameDimensions.height,
+            displayWidth,
+            displayHeight,
             intent.protection,
             DEFAULT_ROUNDING
           );
@@ -335,11 +348,14 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
           displayHeight = protectionResult.height;
         }
 
-        const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
+        const preciseAspectRatio = calculatePreciseAspectRatio(transformResult.effectiveAspectRatio.width, transformResult.effectiveAspectRatio.height);
 
         techInfoText += `• ${intent.label || intent.id || `Intent ${index + 1}`}\n`;
         techInfoText += `  Size: ${displayWidth} x ${displayHeight} px\n`;
-        techInfoText += `  Aspect Ratio: ${intent.aspect_ratio.width}:${intent.aspect_ratio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)\n`;
+        techInfoText += `  Aspect Ratio: ${transformResult.effectiveAspectRatio.width}:${transformResult.effectiveAspectRatio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)\n`;
+        if (intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0)) {
+          techInfoText += `  Offset: ${intent.offset.x}px, ${intent.offset.y}px\n`;
+        }
         if (intent.protection) {
           techInfoText += `  Protection: ${intent.protection}%\n`;
         }
@@ -356,9 +372,11 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
   };
 
   const handleExportFDL = () => {
-    // Use the shared export function with custom filename
-    const customFilename = fdlExportFilename || 'framing-decision-list';
-    exportFDLFile(fdl, customFilename);
+    if (!projectName.trim()) {
+      alert('Please enter a Project Name in the Project Information section before exporting.');
+      return;
+    }
+    exportFDLFile(fdl, projectName);
   };
 
   const handleExportArriXML = () => {
@@ -722,7 +740,12 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
   return (
     <div className="bg-white dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-600 rounded-lg p-6 mt-6">
       <div className="flex flex-col items-center">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4 self-center">Frame Line Preview</h3>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2 self-center">Frame Line Preview</h3>
+        {activeContext && (
+          <h3 className="text-md font-medium text-gray-700 dark:text-gray-300 mb-4 self-center">
+            {activeContext.label || `Camera Setup ${(visualizedContextIndex || 0) + 1}`}
+          </h3>
+        )}
         <button 
           onClick={() => setShowTechInfo(!showTechInfo)} 
           className="fdl-button-secondary text-sm mb-3 self-start"
@@ -736,31 +759,32 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
         
         {/* Export Controls */}
         <div className="w-full mt-4 p-4 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg">
-          <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3">Export Options</h4>
+          <h4 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3 text-center">Export Options</h4>
           
           {/* Export FDL Section */}
           <div className="mb-4 pb-4 border-b border-gray-300 dark:border-gray-600">
-            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">ASC FDL Format</h5>
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-              <div className="flex-1 min-w-0">
-                <label htmlFor="fdl-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+            <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">ASC FDL Format</h5>
+            <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-end justify-center">
+              <div className="w-full sm:w-1/2">
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 text-center">
                   Filename
                 </label>
-                <input
-                  type="text"
-                  id="fdl-export-filename"
-                  value={fdlExportFilename}
-                  onChange={(e) => setFdlExportFilename(e.target.value)}
-                  placeholder="framing-decision-list"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm"
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm text-center">
+                  {projectName ? `${projectName.toLowerCase().replace(/[^a-zA-Z0-9]/g, '-')}.fdl` : 'Please set Project Name above'}
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-center">
                   Future-ready ASC specification format (<span className="font-mono">.fdl</span>)
                 </p>
               </div>
               <button
                 onClick={handleExportFDL}
-                className="fdl-button-primary text-sm px-4 py-2 whitespace-nowrap"
+                className={`text-sm px-4 py-2 whitespace-nowrap rounded-md font-medium transition-colors ${
+                  projectName.trim() 
+                    ? 'fdl-button-primary' 
+                    : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                }`}
+                disabled={!projectName.trim()}
+                title={!projectName.trim() ? 'Please enter a Project Name before exporting' : 'Export FDL file'}
               >
                 Export FDL
               </button>
@@ -770,10 +794,10 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
           {/* Export Arri XML Section - Only show when Arri camera is selected */}
           {activeContext?.meta?.manufacturer === 'ARRI' && (
             <div>
-              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Arri XML Format</h5>
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-                <div className="flex-1 min-w-0">
-                  <label htmlFor="arri-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">Arri XML Format</h5>
+              <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-end justify-center">
+                <div className="w-full sm:w-1/2">
+                  <label htmlFor="arri-export-filename" className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 text-center">
                     Filename
                   </label>
                   <input
@@ -782,9 +806,9 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
                     value={arriExportFilename}
                     onChange={(e) => setArriExportFilename(e.target.value)}
                     placeholder="framelines"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100 text-sm text-center"
                   />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 text-center">
                     Camera-ready format for Arri cameras (<span className="font-mono">.xml</span>)
                   </p>
                 </div>
