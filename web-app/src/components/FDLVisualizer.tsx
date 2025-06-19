@@ -9,7 +9,8 @@ import {
   calculateFrameDimensionsWithTransforms,
   getRotationLabel,
   DEFAULT_ROUNDING,
-  type RoundingConfig
+  type RoundingConfig,
+  calculateFramelineGeometry
 } from '../utils/fdlGeometry';
 import { generateFDLId } from '../validation/fdlValidator';
 import { sanitizeFilename } from '../utils/fdlExport';
@@ -211,44 +212,27 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
             if (!intent.aspect_ratio || intent.aspect_ratio.width <= 0 || intent.aspect_ratio.height <= 0) return null;
             
-            // Use enhanced calculation with rotation, offset, and anamorphic support
+            // Use the new unified geometry calculation
             const contextRotation = activeContext?.rotation || 0;
             const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
-            const transformResult = calculateFrameDimensionsWithTransforms(
+            
+            const geometry = calculateFramelineGeometry(
               canvasWidthPx,
               canvasHeightPx,
               intent.aspect_ratio.width,
               intent.aspect_ratio.height,
               contextRotation,
               intent.offset || { x: 0, y: 0 },
-              DEFAULT_ROUNDING,
-              anamorphicSqueeze
+              intent.protection || 0,
+              anamorphicSqueeze,
+              DEFAULT_ROUNDING
             );
             
-            let displayIntentWidthPx = transformResult.dimensions.width;
-            let displayIntentHeightPx = transformResult.dimensions.height;
-            let finalIntentAnchorXPx = transformResult.anchorPoint.x;
-            let finalIntentAnchorYPx = transformResult.anchorPoint.y;
-
-            // Apply protection if present
-            if (intent.protection && intent.protection > 0 && intent.protection < 100) {
-              const protectionResult = calculateFrameWithProtection(
-                displayIntentWidthPx,
-                displayIntentHeightPx,
-                intent.protection,
-                DEFAULT_ROUNDING
-              );
-
-              displayIntentWidthPx = protectionResult.width;
-              displayIntentHeightPx = protectionResult.height;
-              finalIntentAnchorXPx += protectionResult.offsetX;
-              finalIntentAnchorYPx += protectionResult.offsetY;
-            }
-
-            const scaledIntentWidth = displayIntentWidthPx * overallScale;
-            const scaledIntentHeight = displayIntentHeightPx * overallScale;
-            const intentRectX = canvasRectX + (finalIntentAnchorXPx * overallScale);
-            const intentRectY = canvasRectY + (finalIntentAnchorYPx * overallScale);
+            // Use the final frameline dimensions and position (what the user sees)
+            const scaledIntentWidth = geometry.finalFrameDimensions.width * overallScale;
+            const scaledIntentHeight = geometry.finalFrameDimensions.height * overallScale;
+            const intentRectX = canvasRectX + (geometry.finalAnchorPoint.x * overallScale);
+            const intentRectY = canvasRectY + (geometry.finalAnchorPoint.y * overallScale);
 
             const strokeColor = intentColors[originalIndex % intentColors.length];
 
@@ -343,39 +327,29 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
         const canvasWidth = primaryCanvas.dimensions?.width || 0;
         const canvasHeight = primaryCanvas.dimensions?.height || 0;
         
-        // Use enhanced calculation with rotation, offset, and anamorphic support
+        // Use the new unified geometry calculation
         const contextRotation = activeContext?.rotation || 0;
         const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
-        const transformResult = calculateFrameDimensionsWithTransforms(
+        
+        const geometry = calculateFramelineGeometry(
           canvasWidth,
           canvasHeight,
           intent.aspect_ratio.width,
           intent.aspect_ratio.height,
           contextRotation,
           intent.offset || { x: 0, y: 0 },
-          DEFAULT_ROUNDING,
-          anamorphicSqueeze
+          intent.protection || 0,
+          anamorphicSqueeze,
+          DEFAULT_ROUNDING
         );
         
-        let displayWidth = transformResult.dimensions.width;
-        let displayHeight = transformResult.dimensions.height;
-        
-        if (intent.protection && intent.protection > 0 && intent.protection < 100) {
-          const protectionResult = calculateFrameWithProtection(
-            displayWidth,
-            displayHeight,
-            intent.protection,
-            DEFAULT_ROUNDING
-          );
-          displayWidth = protectionResult.width;
-          displayHeight = protectionResult.height;
-        }
-
-        const preciseAspectRatio = calculatePreciseAspectRatio(transformResult.effectiveAspectRatio.width, transformResult.effectiveAspectRatio.height);
+        const displayWidth = geometry.finalFrameDimensions.width;
+        const displayHeight = geometry.finalFrameDimensions.height;
+        const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
 
                   techInfoText += `• ${intent.label || `Frameline ${index + 1}`}\n`;
         techInfoText += `  Size: ${displayWidth} x ${displayHeight} px\n`;
-        techInfoText += `  Aspect Ratio: ${transformResult.effectiveAspectRatio.width}:${transformResult.effectiveAspectRatio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)\n`;
+        techInfoText += `  Aspect Ratio: ${intent.aspect_ratio.width}:${intent.aspect_ratio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)\n`;
         if (intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0)) {
           techInfoText += `  Offset: ${intent.offset.x}px, ${intent.offset.y}px\n`;
         }
@@ -725,35 +699,25 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
           const canvasWidth = primaryCanvas.dimensions?.width || 0;
           const canvasHeight = primaryCanvas.dimensions?.height || 0;
           
-          // Use enhanced calculation with rotation, offset, and anamorphic support
+          // Use the new unified geometry calculation
           const contextRotation = activeContext?.rotation || 0;
           const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
-          const transformResult = calculateFrameDimensionsWithTransforms(
+          
+          const geometry = calculateFramelineGeometry(
             canvasWidth,
             canvasHeight,
             intent.aspect_ratio.width,
             intent.aspect_ratio.height,
             contextRotation,
             intent.offset || { x: 0, y: 0 },
-            DEFAULT_ROUNDING,
-            anamorphicSqueeze
+            intent.protection || 0,
+            anamorphicSqueeze,
+            DEFAULT_ROUNDING
           );
           
-          let displayWidth = transformResult.dimensions.width;
-          let displayHeight = transformResult.dimensions.height;
-          
-          if (intent.protection && intent.protection > 0 && intent.protection < 100) {
-            const protectionResult = calculateFrameWithProtection(
-              displayWidth,
-              displayHeight,
-              intent.protection,
-              DEFAULT_ROUNDING
-            );
-            displayWidth = protectionResult.width;
-            displayHeight = protectionResult.height;
-          }
-
-          const preciseAspectRatio = calculatePreciseAspectRatio(transformResult.effectiveAspectRatio.width, transformResult.effectiveAspectRatio.height);
+          const displayWidth = geometry.finalFrameDimensions.width;
+          const displayHeight = geometry.finalFrameDimensions.height;
+          const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
 
           return (
             <div key={`tech-intent-${intent.id || index}`} style={{...techInfoSectionStyle, borderTop: '1px solid #333333', paddingTop: '0.75rem' }}>

@@ -728,4 +728,121 @@ export function testCalculations() {
 // Make test function available globally for debugging
 if (typeof window !== 'undefined') {
   (window as any).testFDLCalculations = testCalculations;
+}
+
+/**
+ * Calculate complete frameline geometry with user-centric offsets
+ * This function provides a unified calculation pipeline where:
+ * - Offsets move the visible (extracted) frameline, not the base frameline
+ * - Same math flow for 1x and anamorphic modes
+ * - User sees consistent behavior regardless of extraction percentage
+ */
+export function calculateFramelineGeometry(
+  canvasWidth: number,
+  canvasHeight: number,
+  aspectRatioWidth: number,
+  aspectRatioHeight: number,
+  rotation: RotationAngle = 0,
+  userOffset: FDLPoint = { x: 0, y: 0 }, // User-desired offset for the visible frameline
+  protectionPercent: number = 0,
+  anamorphicSqueeze: number = 1.0,
+  roundingConfig: RoundingConfig = DEFAULT_ROUNDING
+): {
+  // Base frameline (before extraction)
+  baseFrameDimensions: { width: number; height: number };
+  baseAnchorPoint: FDLPoint;
+  
+  // Final extracted frameline (what user sees)
+  finalFrameDimensions: { width: number; height: number };
+  finalAnchorPoint: FDLPoint;
+  
+  // Coordinate system info
+  effectiveCanvasDimensions: { width: number; height: number };
+  
+  // Validation
+  isValidOffset: boolean;
+  clampedUserOffset: FDLPoint;
+  maxUserOffset: FDLPoint;
+  minUserOffset: FDLPoint;
+} {
+  // Apply anamorphic desqueeze to canvas dimensions
+  const effectiveCanvasWidth = Math.round(canvasWidth * anamorphicSqueeze);
+  const effectiveCanvasHeight = canvasHeight;
+
+  // Apply rotation to aspect ratio
+  const rotatedAspectRatio = applyRotationToAspectRatio(aspectRatioWidth, aspectRatioHeight, rotation);
+
+  // Calculate base frame dimensions (before extraction)
+  const baseFrameDimensions = calculateExactFrameDimensions(
+    effectiveCanvasWidth,
+    effectiveCanvasHeight,
+    rotatedAspectRatio.width,
+    rotatedAspectRatio.height,
+    roundingConfig
+  );
+
+  // Calculate extracted frame dimensions (what user sees)
+  let finalFrameDimensions = { ...baseFrameDimensions };
+  let extractionOffset = { x: 0, y: 0 };
+  
+  if (protectionPercent > 0 && protectionPercent < 100) {
+    const protectionResult = calculateFrameWithProtection(
+      baseFrameDimensions.width,
+      baseFrameDimensions.height,
+      protectionPercent,
+      roundingConfig
+    );
+    finalFrameDimensions = {
+      width: protectionResult.width,
+      height: protectionResult.height
+    };
+    extractionOffset = {
+      x: protectionResult.offsetX,
+      y: protectionResult.offsetY
+    };
+  }
+
+  // Calculate bounds for user offset (how far the visible frameline can move)
+  const maxUserOffsetX = (effectiveCanvasWidth - finalFrameDimensions.width) / 2;
+  const maxUserOffsetY = (effectiveCanvasHeight - finalFrameDimensions.height) / 2;
+  const minUserOffsetX = -maxUserOffsetX;
+  const minUserOffsetY = -maxUserOffsetY;
+
+  // Clamp user offset to valid bounds
+  const clampedUserOffset = {
+    x: Math.max(minUserOffsetX, Math.min(maxUserOffsetX, userOffset.x)),
+    y: Math.max(minUserOffsetY, Math.min(maxUserOffsetY, userOffset.y))
+  };
+
+  // Calculate final anchor point for the visible frameline
+  const centeredX = (effectiveCanvasWidth - finalFrameDimensions.width) / 2;
+  const centeredY = (effectiveCanvasHeight - finalFrameDimensions.height) / 2;
+  
+  const finalAnchorPoint = {
+    x: applyASCRounding(centeredX + clampedUserOffset.x, roundingConfig),
+    y: applyASCRounding(centeredY + clampedUserOffset.y, roundingConfig)
+  };
+
+  // Calculate base anchor point (for internal calculations)
+  // This is where the base frameline needs to be positioned to achieve the desired final position
+  const baseAnchorPoint = {
+    x: finalAnchorPoint.x - extractionOffset.x,
+    y: finalAnchorPoint.y - extractionOffset.y
+  };
+
+  // Validation
+  const isValidOffset = Math.abs(clampedUserOffset.x - userOffset.x) < 1 && 
+                       Math.abs(clampedUserOffset.y - userOffset.y) < 1;
+
+  return {
+    baseFrameDimensions,
+    baseAnchorPoint,
+    finalFrameDimensions,
+    finalAnchorPoint,
+    effectiveCanvasDimensions: { width: effectiveCanvasWidth, height: effectiveCanvasHeight },
+    isValidOffset,
+    clampedUserOffset,
+    maxUserOffset: { x: maxUserOffsetX, y: maxUserOffsetY },
+    minUserOffset: { x: minUserOffsetX, y: minUserOffsetY }
+  };
 } 

@@ -3,7 +3,7 @@ import type { FDL, FramingIntent, Context, Canvas, FramingDecision } from '../ty
 import { generateFDLId, generateUUID } from '../validation/fdlValidator';
 import { COMMON_ASPECT_RATIOS } from '../types/fdl';
 import type { RotationAngle } from '../types/fdl';
-import { getRotationLabel, calculateFrameDimensionsWithTransforms, validateOffset, DEFAULT_ROUNDING } from '../utils/fdlGeometry';
+import { getRotationLabel, calculateFrameDimensionsWithTransforms, validateOffset, DEFAULT_ROUNDING, calculateFrameWithProtection, calculateFramelineGeometry } from '../utils/fdlGeometry';
 import FDLVisualizer from './FDLVisualizer';
 import FrameLeaderEditor from './FrameLeaderEditor';
 import { calculateFramingDecisionGeometry } from '../utils/fdlGeometry';
@@ -1406,7 +1406,17 @@ const FDLEditor: React.FC = () => {
                           </div>
 
                           {/* Third Row for Offset */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Position Offsets</span>
+                              <button
+                                onClick={() => updateFramingIntent(index, { offset: { x: 0, y: 0 } })}
+                                className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+                              >
+                                Reset Both
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {(() => {
                               // Calculate offset bounds for this intent
                               const contextRotation = (fdl.contexts && fdl.contexts[selectedVisualizedContextIndex || 0])?.rotation || 0;
@@ -1416,9 +1426,22 @@ const FDLEditor: React.FC = () => {
                                 return (
                                   <>
                                     <div>
-                                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        X Offset (px)
-                                      </label>
+                                      <div className="flex justify-between items-center mb-1">
+                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                          X Offset (px)
+                                        </label>
+                                        <button
+                                          onClick={() => updateFramingIntent(index, { 
+                                            offset: { 
+                                              x: 0, 
+                                              y: intent.offset?.y || 0 
+                                            }
+                                          })}
+                                          className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        >
+                                          Reset X
+                                        </button>
+                                      </div>
                                       <input
                                         type="number"
                                         value={intent.offset?.x || 0}
@@ -1436,9 +1459,22 @@ const FDLEditor: React.FC = () => {
                                       </p>
                                     </div>
                                     <div>
-                                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Y Offset (px)
-                                      </label>
+                                      <div className="flex justify-between items-center mb-1">
+                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                          Y Offset (px)
+                                        </label>
+                                        <button
+                                          onClick={() => updateFramingIntent(index, { 
+                                            offset: { 
+                                              x: intent.offset?.x || 0, 
+                                              y: 0 
+                                            }
+                                          })}
+                                          className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                        >
+                                          Reset Y
+                                        </button>
+                                      </div>
                                       <input
                                         type="number"
                                         value={intent.offset?.y || 0}
@@ -1459,22 +1495,19 @@ const FDLEditor: React.FC = () => {
                                 );
                               }
 
-                              const transformResult = calculateFrameDimensionsWithTransforms(
+                              const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+                              
+                              // Use the new unified geometry calculation
+                              const geometry = calculateFramelineGeometry(
                                 primaryCanvas.dimensions.width,
                                 primaryCanvas.dimensions.height,
                                 intent.aspect_ratio.width,
                                 intent.aspect_ratio.height,
                                 contextRotation,
-                                { x: 0, y: 0 }, // Use center for bounds calculation
+                                { x: 0, y: 0 }, // Center position for bounds calculation
+                                intent.protection || 0,
+                                anamorphicSqueeze,
                                 DEFAULT_ROUNDING
-                              );
-
-                              const bounds = validateOffset(
-                                transformResult.dimensions.width,
-                                transformResult.dimensions.height,
-                                primaryCanvas.dimensions.width,
-                                primaryCanvas.dimensions.height,
-                                { x: 0, y: 0 }
                               );
 
                               const currentXOffset = intent.offset?.x || 0;
@@ -1483,14 +1516,27 @@ const FDLEditor: React.FC = () => {
                               return (
                                 <>
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                      X Offset (px)
-                                    </label>
+                                    <div className="flex justify-between items-center mb-1">
+                                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        X Offset (px)
+                                      </label>
+                                      <button
+                                        onClick={() => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: 0, 
+                                            y: currentYOffset 
+                                          }
+                                        })}
+                                        className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                      >
+                                        Reset X
+                                      </button>
+                                    </div>
                                     <div className="space-y-2">
                                       <input
                                         type="range"
-                                        min={Math.round(bounds.minOffset.x)}
-                                        max={Math.round(bounds.maxOffset.x)}
+                                        min={Math.round(geometry.minUserOffset.x)}
+                                        max={Math.round(geometry.maxUserOffset.x)}
                                         value={currentXOffset}
                                         onChange={(e) => updateFramingIntent(index, { 
                                           offset: { 
@@ -1503,8 +1549,8 @@ const FDLEditor: React.FC = () => {
                                       <input
                                         type="number"
                                         value={currentXOffset}
-                                        min={Math.round(bounds.minOffset.x)}
-                                        max={Math.round(bounds.maxOffset.x)}
+                                        min={Math.round(geometry.minUserOffset.x)}
+                                        max={Math.round(geometry.maxUserOffset.x)}
                                         onChange={(e) => updateFramingIntent(index, { 
                                           offset: { 
                                             x: Number(e.target.value), 
@@ -1515,18 +1561,31 @@ const FDLEditor: React.FC = () => {
                                       />
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                      Range: {Math.round(bounds.minOffset.x)} to {Math.round(bounds.maxOffset.x)}px
+                                      Range: {Math.round(geometry.minUserOffset.x)} to {Math.round(geometry.maxUserOffset.x)}px
                                     </p>
                                   </div>
                                   <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                      Y Offset (px)
-                                    </label>
+                                    <div className="flex justify-between items-center mb-1">
+                                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Y Offset (px)
+                                      </label>
+                                      <button
+                                        onClick={() => updateFramingIntent(index, { 
+                                          offset: { 
+                                            x: currentXOffset, 
+                                            y: 0 
+                                          }
+                                        })}
+                                        className="px-1 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                      >
+                                        Reset Y
+                                      </button>
+                                    </div>
                                     <div className="space-y-2">
                                       <input
                                         type="range"
-                                        min={Math.round(bounds.minOffset.y)}
-                                        max={Math.round(bounds.maxOffset.y)}
+                                        min={Math.round(geometry.minUserOffset.y)}
+                                        max={Math.round(geometry.maxUserOffset.y)}
                                         value={currentYOffset}
                                         onChange={(e) => updateFramingIntent(index, { 
                                           offset: { 
@@ -1539,8 +1598,8 @@ const FDLEditor: React.FC = () => {
                                       <input
                                         type="number"
                                         value={currentYOffset}
-                                        min={Math.round(bounds.minOffset.y)}
-                                        max={Math.round(bounds.maxOffset.y)}
+                                        min={Math.round(geometry.minUserOffset.y)}
+                                        max={Math.round(geometry.maxUserOffset.y)}
                                         onChange={(e) => updateFramingIntent(index, { 
                                           offset: { 
                                             x: currentXOffset, 
@@ -1551,12 +1610,13 @@ const FDLEditor: React.FC = () => {
                                       />
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                      Range: {Math.round(bounds.minOffset.y)} to {Math.round(bounds.maxOffset.y)}px
+                                      Range: {Math.round(geometry.minUserOffset.y)} to {Math.round(geometry.maxUserOffset.y)}px
                                     </p>
                                   </div>
                                 </>
                               );
                             })()}
+                            </div>
                           </div>
                           
                           {/* Helper text for offsets */}
