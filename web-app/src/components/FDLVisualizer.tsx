@@ -32,9 +32,15 @@ interface FDLVisualizerProps {
 const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex, selectedCameraSelections = [] }) => {
   const [showTechInfo, setShowTechInfo] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
   const { settings } = useFrameLeaderSettingsStore();
 
   const [arriExportFilename, setArriExportFilename] = useState('framelines');
+  
+  // State for draggable tech info panel
+  const [techInfoPosition, setTechInfoPosition] = useState({ x: window.innerWidth - 370, y: 100 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const mainContainerStyle: React.CSSProperties = {
     border: '2px solid #9ca3af',
@@ -80,9 +86,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
 
   const techInfoPanelStyle: React.CSSProperties = {
     position: 'fixed',
-    top: '50%',
-    right: '20px',
-    transform: 'translateY(-50%)',
+    left: `${techInfoPosition.x}px`,
+    top: `${techInfoPosition.y}px`,
     width: '350px',
     maxHeight: '80vh',
     backgroundColor: '#1a1a1a',
@@ -95,6 +100,7 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     display: 'flex',
     flexDirection: 'column',
     zIndex: 40,
+    cursor: isDragging ? 'grabbing' : 'default',
   };
 
   const techInfoHeaderStyle: React.CSSProperties = {
@@ -190,79 +196,213 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
       
       const reversedIntents = [...(fdl.framing_intents || [])].reverse();
 
+      // Calculate tooltip data
+      const sensorWidth = primaryCanvas.photosite_dimensions?.width || 0;
+      const sensorHeight = primaryCanvas.photosite_dimensions?.height || 0;
+      const sensorMegapixels = sensorWidth && sensorHeight ? ((sensorWidth * sensorHeight) / 1000000).toFixed(1) : 'N/A';
+      const recordedMegapixels = canvasWidthPx && canvasHeightPx ? ((canvasWidthPx * canvasHeightPx) / 1000000).toFixed(1) : 'N/A';
+      const tooltipEffectiveCanvasWidthPx = canvasWidthPx * anamorphicSqueeze;
+      const recordedAspectRatio = tooltipEffectiveCanvasWidthPx && canvasHeightPx ? (tooltipEffectiveCanvasWidthPx / canvasHeightPx).toFixed(2) : 'N/A';
+      const sensorPhysicalWidth = primaryCanvas.physical_dimensions?.width || 0;
+      const sensorPhysicalHeight = primaryCanvas.physical_dimensions?.height || 0;
+      const imageCircleMm = sensorPhysicalWidth && sensorPhysicalHeight ? 
+        Math.sqrt(Math.pow(sensorPhysicalWidth, 2) + Math.pow(sensorPhysicalHeight, 2)).toFixed(1) : 'N/A';
+
       canvasDisplay = (
-        <svg
-          viewBox={`0 0 ${svgViewportWidth} ${svgViewportHeight}`}
-          preserveAspectRatio="xMidYMid meet"
-          style={svgContainerStyle}
-        >
-          <rect
-            x={canvasRectX}
-            y={canvasRectY}
-            width={scaledCanvasWidth}
-            height={scaledCanvasHeight}
-            fill="#d1d5db"
-            stroke="#6b7280"
-            strokeWidth="0.5"
-          />
+        <div style={{ position: 'relative', width: '100%' }}>
+          <svg
+            viewBox={`0 0 ${svgViewportWidth} ${svgViewportHeight}`}
+            preserveAspectRatio="xMidYMid meet"
+            style={svgContainerStyle}
+          >
+            {/* Full Sensor Area (white background with tooltip) */}
+            <rect
+              x="0"
+              y="0"
+              width={svgViewportWidth}
+              height={svgViewportHeight}
+              fill="white"
+              stroke="none"
+            >
+              {showLabels && (
+                <title>
+                  {`Full Sensor Area
+Dimensions: ${sensorWidth} × ${sensorHeight} photosites
+Physical Size: ${formatNumberForDisplay(sensorPhysicalWidth)} × ${formatNumberForDisplay(sensorPhysicalHeight)} mm
+Megapixels: ${sensorMegapixels}MP
+Image Circle: ${imageCircleMm}mm
+Total Photosite Count: ${sensorWidth && sensorHeight ? (sensorWidth * sensorHeight).toLocaleString() : 'N/A'}`}
+                </title>
+              )}
+            </rect>
 
-          {reversedIntents.map((intent) => {
-            const originalIndex = (fdl.framing_intents || []).findIndex(i => i.id === intent.id);
-            if (originalIndex === -1) return null; 
+            {/* Recorded Area (grey rectangle with tooltip) */}
+            <rect
+              x={canvasRectX}
+              y={canvasRectY}
+              width={scaledCanvasWidth}
+              height={scaledCanvasHeight}
+              fill="#d1d5db"
+              stroke="#6b7280"
+              strokeWidth="0.5"
+            >
+              {showLabels && (
+                <title>
+                  {`Recorded/Captured Area
+Dimensions: ${canvasWidthPx} × ${canvasHeightPx} px
+${anamorphicSqueeze > 1.0 ? `Effective Dimensions (Desqueezed): ${Math.round(tooltipEffectiveCanvasWidthPx)} × ${canvasHeightPx} px
+Anamorphic Squeeze: ${anamorphicSqueeze}x
+` : ''}Aspect Ratio: ${recordedAspectRatio}:1
+Megapixels: ${recordedMegapixels}MP
+Recording Mode: ${anamorphicSqueeze > 1.0 ? 'Anamorphic capture' : 'Standard capture'}
+Sensor Coverage: ${((canvasWidthPx * canvasHeightPx) / (sensorWidth * sensorHeight) * 100).toFixed(1)}% of full sensor`}
+                </title>
+              )}
+            </rect>
 
-            if (!intent.aspect_ratio || intent.aspect_ratio.width <= 0 || intent.aspect_ratio.height <= 0) return null;
-            
-            // Use the new unified geometry calculation
-            const contextRotation = activeContext?.rotation || 0;
-            const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
-            
-            const geometry = calculateFramelineGeometry(
-              canvasWidthPx,
-              canvasHeightPx,
-              intent.aspect_ratio.width,
-              intent.aspect_ratio.height,
-              contextRotation,
-              intent.offset || { x: 0, y: 0 },
-              intent.protection || 0,
-              anamorphicSqueeze,
-              DEFAULT_ROUNDING
-            );
-            
-            // Use the final frameline dimensions and position (what the user sees)
-            const scaledIntentWidth = geometry.finalFrameDimensions.width * overallScale;
-            const scaledIntentHeight = geometry.finalFrameDimensions.height * overallScale;
-            const intentRectX = canvasRectX + (geometry.finalAnchorPoint.x * overallScale);
-            const intentRectY = canvasRectY + (geometry.finalAnchorPoint.y * overallScale);
-
-            const strokeColor = intentColors[originalIndex % intentColors.length];
-
-            return (
-              <g key={intent.id || `intent-${originalIndex}`}>
-                <rect
-                  x={intentRectX}
-                  y={intentRectY}
-                  width={scaledIntentWidth}
-                  height={scaledIntentHeight}
-                  fill="none"
-                  stroke={strokeColor}
-                  strokeWidth="2"
+            {/* Recorded Area Label with Arrow */}
+            {showLabels && (
+              <g>
+                {/* Arrow line */}
+                <line
+                  x1={canvasRectX - 20}
+                  y1={canvasRectY - 15}
+                  x2={canvasRectX}
+                  y2={canvasRectY}
+                  stroke="#374151"
+                  strokeWidth="1.5"
+                  markerEnd="url(#arrowhead)"
                 />
+                {/* Arrow marker definition */}
+                <defs>
+                  <marker
+                    id="arrowhead"
+                    markerWidth="8"
+                    markerHeight="6"
+                    refX="8"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <polygon
+                      points="0 0, 8 3, 0 6"
+                      fill="#374151"
+                    />
+                  </marker>
+                </defs>
+                {/* Label text */}
                 <text
-                  x={intentRectX + scaledIntentWidth - 5}
-                  y={intentRectY + 12}
-                  fontSize="8"
-                  fill={strokeColor}
+                  x={canvasRectX - 25}
+                  y={canvasRectY - 18}
+                  fontSize="12"
+                  fill="#374151"
                   textAnchor="end"
-                  style={{ pointerEvents: 'none', fontWeight: 'bold' }}
+                  style={{ fontWeight: 'bold', pointerEvents: 'none' }}
                 >
-                  {intent.label || `Frameline ${originalIndex + 1}`}
-                  {contextRotation ? ` (${getRotationLabel(contextRotation).replace('No Rotation (0°)', '').replace('°', '°')})` : ''}
-                  {intent.protection ? ` (${intent.protection}% ext.)` : ''}
+                  Recorded Area
                 </text>
               </g>
-            );
-          })}
-        </svg>
+            )}
+
+            {reversedIntents.map((intent) => {
+              const originalIndex = (fdl.framing_intents || []).findIndex(i => i.id === intent.id);
+              if (originalIndex === -1) return null; 
+
+              if (!intent.aspect_ratio || intent.aspect_ratio.width <= 0 || intent.aspect_ratio.height <= 0) return null;
+              
+              // Use the new unified geometry calculation
+              const contextRotation = activeContext?.rotation || 0;
+              const anamorphicSqueeze = primaryCanvas.anamorphic_squeeze || 1.0;
+              
+              const geometry = calculateFramelineGeometry(
+                canvasWidthPx,
+                canvasHeightPx,
+                intent.aspect_ratio.width,
+                intent.aspect_ratio.height,
+                contextRotation,
+                intent.offset || { x: 0, y: 0 },
+                intent.protection || 0,
+                anamorphicSqueeze,
+                DEFAULT_ROUNDING
+              );
+              
+              // Use the final frameline dimensions and position (what the user sees)
+              const scaledIntentWidth = geometry.finalFrameDimensions.width * overallScale;
+              const scaledIntentHeight = geometry.finalFrameDimensions.height * overallScale;
+              const intentRectX = canvasRectX + (geometry.finalAnchorPoint.x * overallScale);
+              const intentRectY = canvasRectY + (geometry.finalAnchorPoint.y * overallScale);
+
+              const strokeColor = intentColors[originalIndex % intentColors.length];
+              
+              // Calculate tooltip data for this frameline
+              const preciseAspectRatio = calculatePreciseAspectRatio(intent.aspect_ratio.width, intent.aspect_ratio.height);
+              const frameMegapixels = geometry.finalFrameDimensions.width && geometry.finalFrameDimensions.height ? 
+                ((geometry.finalFrameDimensions.width * geometry.finalFrameDimensions.height) / 1000000).toFixed(1) : 'N/A';
+              const recordedPercentageWidth = ((geometry.finalFrameDimensions.width / canvasWidthPx) * 100).toFixed(1);
+              const recordedPercentageHeight = ((geometry.finalFrameDimensions.height / canvasHeightPx) * 100).toFixed(1);
+              const maxOffsetX = geometry.maxUserOffset.x;
+              const maxOffsetY = geometry.maxUserOffset.y;
+
+              return (
+                <g key={intent.id || `intent-${originalIndex}`}>
+                  <rect
+                    x={intentRectX}
+                    y={intentRectY}
+                    width={scaledIntentWidth}
+                    height={scaledIntentHeight}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth="2"
+                  >
+                    {showLabels && (
+                      <title>
+                        {`${intent.label || `Frameline ${originalIndex + 1}`}
+Delivery Format: ${intent.aspect_ratio.width}:${intent.aspect_ratio.height} (${formatNumberForDisplay(preciseAspectRatio)}:1)
+Dimensions: ${geometry.finalFrameDimensions.width} × ${geometry.finalFrameDimensions.height} px
+Megapixels: ${frameMegapixels}MP
+${intent.protection ? `Extraction: ${intent.protection}% crop
+Base Frame: ${geometry.baseFrameDimensions.width} × ${geometry.baseFrameDimensions.height} px
+` : ''}Coverage: ${recordedPercentageWidth}% × ${recordedPercentageHeight}% of recorded area
+${(intent.offset && (intent.offset.x !== 0 || intent.offset.y !== 0)) ? `Current Offset: ${intent.offset.x}px, ${intent.offset.y}px
+` : ''}Available Offset Range: ±${Math.round(maxOffsetX)}px, ±${Math.round(maxOffsetY)}px
+${contextRotation ? `Camera Rotation: ${getRotationLabel(contextRotation)}
+` : ''}Common Use: ${intent.aspect_ratio.width === 16 && intent.aspect_ratio.height === 9 ? 'Standard HD/4K delivery' : 
+                          intent.aspect_ratio.width === 21 && intent.aspect_ratio.height === 9 ? 'Ultra-wide cinematic' : 
+                          intent.aspect_ratio.width === 4 && intent.aspect_ratio.height === 3 ? 'Traditional 4:3 format' : 
+                          'Custom aspect ratio'}`}
+                      </title>
+                    )}
+                  </rect>
+                  <text
+                    x={intentRectX + scaledIntentWidth - 5}
+                    y={intentRectY + 12}
+                    fontSize="8"
+                    fill={strokeColor}
+                    textAnchor="end"
+                    style={{ pointerEvents: 'none', fontWeight: 'bold' }}
+                  >
+                    {intent.label || `Frameline ${originalIndex + 1}`}
+                    {contextRotation ? ` (${getRotationLabel(contextRotation).replace('No Rotation (0°)', '').replace('°', '°')})` : ''}
+                    {intent.protection ? ` (${intent.protection}% ext.)` : ''}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+          
+          {/* Labels Toggle */}
+          {showLabels && (
+            <div style={{ 
+              position: 'absolute', 
+              bottom: '10px', 
+              right: '10px', 
+              fontSize: '12px',
+              color: '#6b7280',
+              fontStyle: 'italic'
+            }}>
+              Hover for details
+            </div>
+          )}
+        </div>
       );
     } else {
       canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">Selected canvas dimensions are invalid (0 or less).</p>;
@@ -272,6 +412,45 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
   } else {
     canvasDisplay = <p className="text-sm text-gray-500 dark:text-gray-400">No Camera Setup selected or available to display framelines.</p>;
   }
+
+  // Drag functionality for tech info panel
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+    
+    const newX = Math.max(0, Math.min(window.innerWidth - 350, e.clientX - dragOffset.x));
+    const newY = Math.max(0, Math.min(window.innerHeight - 200, e.clientY - dragOffset.y));
+    
+    setTechInfoPosition({
+      x: newX,
+      y: newY
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Add global mouse event listeners for dragging
+  React.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   const copyTechnicalInfo = async () => {
     if (!primaryCanvas || visualizedContextIndex === null) return;
@@ -297,8 +476,17 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     }
     techInfoText += `)\n`;
     
-    if (activeContext?.meta?.manufacturer) {
-      techInfoText += `${activeContext.meta.manufacturer} ${activeContext.meta.model}\n`;
+    // Try to get manufacturer and model from activeContext.meta first, then fall back to selectedCameraSelections
+    const metaManufacturer = activeContext?.meta?.manufacturer;
+    const metaModel = activeContext?.meta?.model;
+    const selectionManufacturer = selectedCameraSelections[visualizedContextIndex || 0]?.manufacturer;
+    const selectionModel = selectedCameraSelections[visualizedContextIndex || 0]?.model;
+    
+    const displayManufacturer = metaManufacturer || selectionManufacturer;
+    const displayModel = metaModel || selectionModel;
+    
+    if (displayManufacturer && displayModel) {
+      techInfoText += `${displayManufacturer} ${displayModel}\n`;
     }
     
     techInfoText += `\nSensor Active Image Area: ${sensorActiveImageArea.photosites}\n`;
@@ -306,6 +494,11 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
     techInfoText += `Photosite Count: ${sensorActiveImageArea.photositeCount}\n`;
     techInfoText += `Image Circle: ${imageCircle.mm}\n`;
     techInfoText += `\nRecording File Image Content: ${recordingFileImageContent}\n`;
+    
+    // Add recording codec if present
+    if (primaryCanvas.recording_codec) {
+      techInfoText += `Recording Codec: ${primaryCanvas.recording_codec}\n`;
+    }
     
     // Add anamorphic info if present
     if (primaryCanvas.anamorphic_squeeze && primaryCanvas.anamorphic_squeeze > 1.0) {
@@ -598,9 +791,27 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
 
     return (
       <div style={techInfoPanelStyle}>
-        <div style={{...techInfoHeaderStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-          <h4 style={{margin: 0, fontSize: '0.9rem', fontWeight: 'bold'}}>Technical Information</h4>
-          <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
+        <div 
+          style={{
+            ...techInfoHeaderStyle, 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            cursor: 'grab',
+            userSelect: 'none'
+          }}
+          onMouseDown={handleMouseDown}
+        >
+          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{opacity: 0.8}}>
+              <circle cx="9" cy="9" r="2"></circle>
+              <circle cx="9" cy="15" r="2"></circle>
+              <circle cx="15" cy="9" r="2"></circle>
+              <circle cx="15" cy="15" r="2"></circle>
+            </svg>
+            <h4 style={{margin: 0, fontSize: '0.9rem', fontWeight: 'bold'}}>Technical Information</h4>
+          </div>
+          <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: '1rem'}}>
             <button
               onClick={() => setShowTechInfo(false)}
               style={{
@@ -658,9 +869,25 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
                 {primaryCanvas.label || 'Primary Canvas'} (Context {visualizedContextIndex + 1}
                 {activeContext?.label && activeContext.label !== `Camera Setup ${visualizedContextIndex + 1}` ? `: ${activeContext.label}` : ''})
             </p>
-            {activeContext?.meta?.manufacturer && (
-                 <p style={techInfoValueStyle}>{activeContext.meta.manufacturer} {activeContext.meta.model}</p>
-            )}
+            {(() => {
+                // Ensure we have valid arrays and indices
+                const validSelections = Array.isArray(selectedCameraSelections) ? selectedCameraSelections : [];
+                const currentIndex = (visualizedContextIndex !== null && visualizedContextIndex >= 0) ? visualizedContextIndex : 0;
+                
+                // Prioritize selectedCameraSelections (current state) over activeContext.meta (potentially stale)
+                const selectionManufacturer = validSelections[currentIndex]?.manufacturer;
+                const selectionModel = validSelections[currentIndex]?.model;
+                const metaManufacturer = activeContext?.meta?.manufacturer;
+                const metaModel = activeContext?.meta?.model;
+                
+                // Use selection data first, fall back to meta data only if selection is not available
+                const displayManufacturer = selectionManufacturer || metaManufacturer;
+                const displayModel = selectionModel || metaModel;
+                
+                return (displayManufacturer && displayModel) ? (
+                    <p style={techInfoValueStyle}>{displayManufacturer} {displayModel}</p>
+                ) : null;
+            })()}
         </div>
 
         <div style={techInfoSectionStyle}>
@@ -676,6 +903,12 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
         <div style={techInfoSectionStyle}>
           <span style={techInfoLabelStyle}>Recording File Image Content:</span>
           <p style={techInfoValueStyle}>{recordingFileImageContent}</p>
+          {primaryCanvas.recording_codec && (
+            <>
+              <span style={techInfoLabelStyle}>Recording Codec:</span>
+              <p style={techInfoValueStyle}>{primaryCanvas.recording_codec}</p>
+            </>
+          )}
           {primaryCanvas.anamorphic_squeeze && primaryCanvas.anamorphic_squeeze > 1.0 && (
             <>
               <span style={techInfoLabelStyle}>Anamorphic Squeeze:</span>
@@ -753,13 +986,26 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
         )}
         <button 
           onClick={() => setShowTechInfo(!showTechInfo)} 
-          className="fdl-button-secondary text-sm mb-3 self-start"
+          className="fdl-button-secondary text-sm mb-3 self-center"
         >
           {showTechInfo ? 'Hide' : 'Show'} Technical Info
         </button>
         {canvasDisplay}
         <div className="w-full h-15 bg-gray-200 dark:bg-gray-600 border border-gray-400 dark:border-gray-500 rounded mt-4 flex items-center justify-center text-gray-600 dark:text-gray-400 text-sm">
           Image Selection Bar (Placeholder)
+        </div>
+        
+        {/* Labels Toggle */}
+        <div className="flex items-center justify-center mt-3">
+          <label className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+            <input
+              type="checkbox"
+              checked={showLabels}
+              onChange={(e) => setShowLabels(e.target.checked)}
+              className="mr-2"
+            />
+            Show Labels
+          </label>
         </div>
         
         {/* Export Arri XML - Only show when Arri camera is selected */}

@@ -415,6 +415,9 @@ const FDLEditor: React.FC = () => {
     };
     setFdl(initialFdl);
     
+    // Reset project name
+    setProjectName('');
+    
     // Reset frame leader settings using the store
     const { resetSettings } = useFrameLeaderSettingsStore.getState();
     const defaultSettings = {
