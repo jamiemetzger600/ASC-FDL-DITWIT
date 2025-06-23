@@ -349,6 +349,19 @@ const FDLEditor: React.FC = () => {
   const { settings, updateSettings } = useFrameLeaderSettingsStore();
   const [selectedVisualizedContextIndex, setSelectedVisualizedContextIndex] = useState<number | null>(null);
   
+  // UI Mode state - toggle between current and floating UI
+  const [uiMode, setUiMode] = useState<'current' | 'floating'>(() => {
+    const saved = localStorage.getItem('fdl-ui-mode');
+    return (saved === 'floating') ? 'floating' : 'current';
+  });
+  
+  // Save UI mode preference
+  const toggleUiMode = () => {
+    const newMode = uiMode === 'current' ? 'floating' : 'current';
+    setUiMode(newMode);
+    localStorage.setItem('fdl-ui-mode', newMode);
+  };
+  
   // Collapsible sections state
   const [collapsedSections, setCollapsedSections] = useState({
     projectInfo: false,
@@ -919,7 +932,13 @@ const FDLEditor: React.FC = () => {
 
   return (
     <div>
-      <Header onExport={handleExport} onImport={handleImport} onReset={handleReset} />
+                      <Header 
+                  onExport={handleExport} 
+                  onImport={handleImport} 
+                  onReset={handleReset}
+                  uiMode={uiMode}
+                  onToggleUiMode={toggleUiMode}
+                />
       <div className="p-6">
         <div className="space-y-8">
                 {/* Banner temporarily hidden */}

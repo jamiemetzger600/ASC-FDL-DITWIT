@@ -7,11 +7,13 @@ interface HeaderProps {
   onExport: () => void;
   onImport: (file: File) => void;
   onReset: () => void;
+  uiMode?: 'current' | 'floating';
+  onToggleUiMode?: () => void;
   // onToggleTestDataViewer: () => void;
   // isTestDataViewerVisible: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onExport, onImport, onReset }) => {
+const Header: React.FC<HeaderProps> = ({ onExport, onImport, onReset, uiMode, onToggleUiMode }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectFileInputRef = useRef<HTMLInputElement>(null);
   const { settings, setSettings } = useFrameLeaderSettingsStore();
@@ -91,6 +93,34 @@ const Header: React.FC<HeaderProps> = ({ onExport, onImport, onReset }) => {
               ASC-DIT-FDL
             </h1>
           </div>
+
+          {/* UI Mode Toggle */}
+          {onToggleUiMode && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Beta UI:</span>
+              <button
+                onClick={onToggleUiMode}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                  ${uiMode === 'floating' 
+                    ? 'bg-blue-600' 
+                    : 'bg-gray-300 dark:bg-gray-600'
+                  }
+                `}
+                title={`Switch to ${uiMode === 'current' ? 'Floating' : 'Current'} UI`}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${uiMode === 'floating' ? 'translate-x-6' : 'translate-x-1'}
+                  `}
+                />
+              </button>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {uiMode === 'floating' ? 'Floating' : 'Current'}
+              </span>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center space-x-2">
