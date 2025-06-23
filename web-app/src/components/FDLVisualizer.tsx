@@ -27,13 +27,14 @@ interface FDLVisualizerProps {
   fdl: FDL;
   visualizedContextIndex: number | null;
   selectedCameraSelections?: CameraSelection[];
+  uiMode?: 'current' | 'floating';
 }
 
-const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex, selectedCameraSelections = [] }) => {
+const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextIndex, selectedCameraSelections = [], uiMode = 'current' }) => {
   const [showTechInfo, setShowTechInfo] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
-  const { settings } = useFrameLeaderSettingsStore();
+  const { settings, updateSettings } = useFrameLeaderSettingsStore();
 
   const [arriExportFilename, setArriExportFilename] = useState('framelines');
   
@@ -41,6 +42,8 @@ const FDLVisualizer: React.FC<FDLVisualizerProps> = ({ fdl, visualizedContextInd
   const [techInfoPosition, setTechInfoPosition] = useState({ x: window.innerWidth - 370, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+
 
   const mainContainerStyle: React.CSSProperties = {
     border: '2px solid #9ca3af',
@@ -451,6 +454,8 @@ ${contextRotation ? `Camera Rotation: ${getRotationLabel(contextRotation)}
       };
     }
   }, [isDragging, dragOffset]);
+
+
 
   const copyTechnicalInfo = async () => {
     if (!primaryCanvas || visualizedContextIndex === null) return;
@@ -975,6 +980,8 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
     );
   };
 
+
+
   return (
     <div className="bg-white dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-600 rounded-lg p-6 mt-6">
       <div className="flex flex-col items-center">
@@ -984,12 +991,16 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
             {activeContext.label || `Camera Setup ${(visualizedContextIndex || 0) + 1}`}
           </h3>
         )}
-        <button 
-          onClick={() => setShowTechInfo(!showTechInfo)} 
-          className="fdl-button-secondary text-sm mb-3 self-center"
-        >
-          {showTechInfo ? 'Hide' : 'Show'} Technical Info
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <button 
+            onClick={() => setShowTechInfo(!showTechInfo)} 
+            className="fdl-button-secondary text-sm"
+          >
+            {showTechInfo ? 'Hide' : 'Show'} Technical Info
+          </button>
+          
+
+        </div>
         {canvasDisplay}
         <div className="w-full h-15 bg-gray-200 dark:bg-gray-600 border border-gray-400 dark:border-gray-500 rounded mt-4 flex items-center justify-center text-gray-600 dark:text-gray-400 text-sm">
           Image Selection Bar (Placeholder)
@@ -1042,6 +1053,8 @@ ${framelineData.map(frame => `\t<!-- Frame Line format${frame.letter}-->
       
       {/* Floating Technical Information Panel */}
       {showTechInfo && renderTechInfoPanel()}
+      
+
     </div>
   );
 };

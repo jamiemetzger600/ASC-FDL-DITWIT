@@ -35,6 +35,7 @@ interface FrameLeaderEditorProps {
   fdl: FDL;
   visualizedContextIndex: number | null;
   onChange: (fdl: FDL) => void;
+  uiMode?: 'current' | 'floating';
 }
 
 // Helper function to calculate geometry for a FramingDecision
@@ -53,7 +54,7 @@ const sanitizeFilename = (name: string): string => {
 
 const FRAME_LEADER_SETTINGS_STORAGE_KEY = 'fdl-frameleader-settings';
 
-const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedContextIndex, onChange }) => {
+const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedContextIndex, onChange, uiMode = 'current' }) => {
   const svgPreviewViewBoxWidth = 800;
   const svgPreviewViewBoxHeight = 450;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -148,6 +149,15 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
   const [isFrameLeaderSettingsVisible, setIsFrameLeaderSettingsVisible] = useState(false);
   const [showFloatingControls, setShowFloatingControls] = useState(false);
   
+  // Floating controls dragging state
+  const [floatingControlsPosition, setFloatingControlsPosition] = useState({ x: 20, y: 80 });
+  const [isFloatingControlsDragging, setIsFloatingControlsDragging] = useState(false);
+  const [floatingControlsDragOffset, setFloatingControlsDragOffset] = useState({ x: 0, y: 0 });
+  const [floatingControlsWidth, setFloatingControlsWidth] = useState<number | null>(null);
+  const [floatingControlsHeight, setFloatingControlsHeight] = useState(400);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  
   // Initialize exportFilename based on the default title text
   const [exportFilename, setExportFilename] = useState<string>(
     () => sanitizeFilename(getDefaultFrameLeaderSettings().title.text) || 'frame-leader'
@@ -205,6 +215,106 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
     document.addEventListener('keydown', handleEscapeKey);
     return () => document.removeEventListener('keydown', handleEscapeKey);
   }, [isFullscreenPreview]);
+
+  // Close floating controls when switching back to current UI mode
+  useEffect(() => {
+    if (uiMode === 'current' && showFloatingControls) {
+      setShowFloatingControls(false);
+    }
+  }, [uiMode, showFloatingControls]);
+
+  // Floating controls drag functionality
+  const handleFloatingControlsMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.parentElement!.getBoundingClientRect(); // Get the floating panel rect
+    setIsFloatingControlsDragging(true);
+    // Don't reset width if user has manually resized - keep current width
+    if (!floatingControlsWidth) {
+      setFloatingControlsWidth(rect.width); // Only capture width if not already set
+    }
+    setFloatingControlsDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const handleFloatingControlsMouseMove = (e: MouseEvent) => {
+    if (!isFloatingControlsDragging) return;
+    
+    const panelWidth = floatingControlsWidth || (window.innerWidth - 140); // Use captured width or calculated default
+    const newX = Math.max(0, Math.min(window.innerWidth - panelWidth, e.clientX - floatingControlsDragOffset.x));
+    const newY = Math.max(0, Math.min(window.innerHeight - floatingControlsHeight, e.clientY - floatingControlsDragOffset.y));
+    
+    setFloatingControlsPosition({
+      x: newX,
+      y: newY
+    });
+  };
+
+  const handleFloatingControlsMouseUp = () => {
+    setIsFloatingControlsDragging(false);
+    // Don't reset width to null if user has manually resized
+  };
+
+  // Resize handlers
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const floatingPanel = e.currentTarget.closest('.floating-controls-panel') as HTMLElement;
+    if (floatingPanel) {
+      const rect = floatingPanel.getBoundingClientRect();
+      setIsResizing(true);
+      setResizeStart({
+        x: e.clientX,
+        y: e.clientY,
+        width: rect.width,
+        height: rect.height
+      });
+      setFloatingControlsWidth(rect.width); // Set current width for resizing
+    }
+  };
+
+  const handleResizeMouseMove = (e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const deltaX = e.clientX - resizeStart.x;
+    const deltaY = e.clientY - resizeStart.y;
+    
+    const newWidth = Math.max(300, resizeStart.width + deltaX);
+    const newHeight = Math.max(200, resizeStart.height + deltaY);
+    
+    setFloatingControlsWidth(newWidth);
+    setFloatingControlsHeight(newHeight);
+  };
+
+  const handleResizeMouseUp = () => {
+    setIsResizing(false);
+  };
+
+  // Add global mouse event listeners for floating controls dragging
+  useEffect(() => {
+    if (isFloatingControlsDragging) {
+      document.addEventListener('mousemove', handleFloatingControlsMouseMove);
+      document.addEventListener('mouseup', handleFloatingControlsMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleFloatingControlsMouseMove);
+        document.removeEventListener('mouseup', handleFloatingControlsMouseUp);
+      };
+    }
+  }, [isFloatingControlsDragging, floatingControlsDragOffset]);
+
+  // Add global mouse event listeners for resizing
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMouseMove);
+      document.addEventListener('mouseup', handleResizeMouseUp);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMouseMove);
+        document.removeEventListener('mouseup', handleResizeMouseUp);
+      };
+    }
+  }, [isResizing, resizeStart]);
 
   const handleIntentVisibilityChange = (intentId: string, isVisible: boolean) => {
     if (!primaryCanvas || visualizedContextIndex === null) return;
@@ -960,7 +1070,7 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
 
              // Arrow properties
        const arrowSize = 12;
-       const arrowOffset = 8; // Distance inside from the frame edge
+       const arrowOffset = 1; // Distance to touch the inside line of the frameline (accounting for 2px stroke width)
        const centerOffset = scaledFrameWidth * 0.2; // Position arrows towards center of each edge to avoid Siemens stars
 
        // Top arrows (pointing DOWN into frame) - positioned towards center to avoid Siemens stars
@@ -1249,19 +1359,23 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
           <div className="mb-6">
             <div className="relative mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 text-center">Frame Leader Preview</h3>
-              <button
-                onClick={() => setShowFloatingControls(!showFloatingControls)}
-                className="absolute right-0 top-0 fdl-button-secondary text-sm flex items-center gap-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                </svg>
-                {showFloatingControls ? 'Hide Controls' : 'Floating Controls'}
-              </button>
+              {uiMode === 'floating' && (
+                <button
+                  onClick={() => setShowFloatingControls(!showFloatingControls)}
+                  className="absolute right-0 top-0 fdl-button-secondary text-sm flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                  </svg>
+                  {showFloatingControls ? 'Hide Controls' : 'Floating Controls'}
+                </button>
+              )}
             </div>
 
             <div 
-              className="border border-gray-400 rounded-md p-2 bg-gray-100 dark:bg-gray-800 dark:border-gray-600 max-w-3xl mx-auto aspect-video cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+              className={`border border-gray-400 rounded-md p-2 bg-gray-100 dark:bg-gray-800 dark:border-gray-600 mx-auto aspect-video cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors ${
+                uiMode === 'floating' ? 'max-w-6xl' : 'max-w-3xl'
+              }`}
               style={{ aspectRatio: `${svgPreviewViewBoxWidth}/${svgPreviewViewBoxHeight}` }}
               onClick={() => setIsFullscreenPreview(true)}
               title="Click to view fullscreen"
@@ -1272,8 +1386,9 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
             </div>
           </div>
           
-          {/* Section 2: Controls Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Section 2: Controls Grid - Hide in floating mode */}
+          {uiMode === 'current' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Left Column: Text Element Controls */}
             <div className="md:col-span-2 space-y-4 pr-4 md:border-r border-gray-400 dark:border-gray-600">
               {( ['title', 'director', 'dp', 'text1', 'text2'] as const).map((key) => {
@@ -1796,191 +1911,600 @@ const FrameLeaderEditor: React.FC<FrameLeaderEditorProps> = ({ fdl, visualizedCo
 
             </div>
           </div>
+          )}
         </>
       )}
 
       {/* Floating Controls Panel */}
       {showFloatingControls && isFrameLeaderSettingsVisible && (
-        <div className="fixed top-20 right-6 bg-white dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-600 rounded-lg shadow-2xl z-40 w-80 max-h-[80vh] overflow-y-auto">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4 border-b border-gray-300 dark:border-gray-600 pb-3">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Controls</h3>
+        <div 
+          className="floating-controls-panel fixed bg-white dark:bg-gray-800 border-2 border-gray-400 dark:border-gray-600 rounded-lg shadow-2xl z-40 overflow-hidden flex flex-col"
+          style={{
+            left: `${floatingControlsPosition.x}px`,
+            top: `${floatingControlsPosition.y}px`,
+            width: floatingControlsWidth ? `${floatingControlsWidth}px` : 'calc(100vw - 140px)', // Better width calculation
+            height: `${floatingControlsHeight}px`,
+            cursor: isFloatingControlsDragging ? 'grabbing' : 'default',
+          }}
+        >
+          <div 
+            className="p-4 border-b border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 cursor-grab"
+            onMouseDown={handleFloatingControlsMouseDown}
+            style={{ userSelect: 'none' }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-600 dark:text-gray-400">
+                  <circle cx="9" cy="9" r="2"></circle>
+                  <circle cx="9" cy="15" r="2"></circle>
+                  <circle cx="15" cy="9" r="2"></circle>
+                  <circle cx="15" cy="15" r="2"></circle>
+                </svg>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Frame Leader Controls</h3>
+              </div>
               <button
                 onClick={() => setShowFloatingControls(false)}
-                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 p-1"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
             
-            <div className="space-y-4">
-              {/* Logo Controls */}
-              {settings.customLogoEnabled && settings.customLogoUrl && (
+            <div className="grid grid-cols-3 gap-4">
+              {/* Left Column: Quick Toggles & Settings */}
+              <div className="space-y-3">
+                {/* Quick Toggle Controls */}
                 <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Logo Controls</h4>
-                  
-                  {/* Logo Size */}
-                  <div className="mb-3">
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.customLogoSize || 15}%</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="150"
-                      step="1"
-                      value={settings.customLogoSize || 15}
-                      onChange={e => handleGenericSettingChange('customLogoSize', Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                  </div>
-                  
-                  {/* Logo Position */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">X Position: {settings.customLogoPosition?.x || 50}%</label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        step="1" 
-                        value={settings.customLogoPosition?.x || 50} 
-                        onChange={e => handleGenericSettingChange('customLogoPosition', { ...(settings.customLogoPosition || {x:50,y:50}), x: Number(e.target.value)})} 
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Y Position: {settings.customLogoPosition?.y || 50}%</label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        step="1" 
-                        value={settings.customLogoPosition?.y || 50} 
-                        onChange={e => handleGenericSettingChange('customLogoPosition', { ...(settings.customLogoPosition || {x:50,y:50}), y: Number(e.target.value)})} 
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Text Size Controls */}
-              {(['title', 'director', 'dp', 'text1', 'text2'] as const).map((key) => {
-                const currentSettings = settings[key];
-                if (!currentSettings.visible) return null;
-                
-                let labelText = key.charAt(0).toUpperCase() + key.slice(1);
-                if (key === 'dp') labelText = 'DP';
-                else if (key === 'text1') labelText = 'Custom Text 1';
-                else if (key === 'text2') labelText = 'Custom Text 2';
-                else if (key === 'title') labelText = 'Production';
-                
-                return (
-                  <div key={key} className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{labelText} Size</h4>
-                    <div>
-                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {currentSettings.fontSize}px</label>
-                      <input 
-                        type="range" 
-                        min="8" 
-                        max="48" 
-                        step="1" 
-                        value={currentSettings.fontSize} 
-                        onChange={e => handleTextElementChange(key, 'fontSize', Number(e.target.value))} 
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Siemens Stars Size Control */}
-              {settings.siemensStarsEnabled && (
-                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Siemens Stars Size</h4>
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.siemensStarsSize || 200}px</label>
-                    <input
-                      type="range"
-                      min="10"
-                      max="2000"
-                      step="10"
-                      value={settings.siemensStarsSize || 200}
-                      onChange={e => handleGenericSettingChange('siemensStarsSize', Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Center Marker Size Control */}
-              {settings.centerMarkerEnabled && (
-                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Center Marker Size</h4>
-                  <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.centerMarkerSize || 20}px</label>
-                    <input
-                      type="range"
-                      min="2"
-                      max="100"
-                      step="1"
-                      value={settings.centerMarkerSize || 20}
-                      onChange={e => handleGenericSettingChange('centerMarkerSize', Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Toggle Controls */}
-              <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Toggles</h4>
-                <div className="space-y-2">
-                  {settings.customLogoUrl && (
-                    <label className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Toggles</h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                       <input 
                         type="checkbox" 
-                        checked={settings.customLogoEnabled || false} 
-                        onChange={e => handleGenericSettingChange('customLogoEnabled', e.target.checked)} 
-                        className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        checked={settings.centerMarkerEnabled || false} 
+                        onChange={e => handleGenericSettingChange('centerMarkerEnabled', e.target.checked)} 
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      Show Logo
+                      Center Marker
                     </label>
-                  )}
-                  <label className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={settings.siemensStarsEnabled || false} 
-                      onChange={e => handleGenericSettingChange('siemensStarsEnabled', e.target.checked)} 
-                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    Show Siemens Stars
-                  </label>
-                  <label className="flex items-center text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={settings.centerMarkerEnabled || false} 
-                      onChange={e => handleGenericSettingChange('centerMarkerEnabled', e.target.checked)} 
-                      className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    Show Center Marker
-                  </label>
+                    <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.siemensStarsEnabled || false} 
+                        onChange={e => handleGenericSettingChange('siemensStarsEnabled', e.target.checked)} 
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      Siemens Stars
+                    </label>
+                    <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.showCameraInfo || false} 
+                        onChange={e => handleGenericSettingChange('showCameraInfo', e.target.checked)} 
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      Camera Info
+                    </label>
+                    <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.anamorphicDesqueezeInPreview || false} 
+                        onChange={e => handleGenericSettingChange('anamorphicDesqueezeInPreview', e.target.checked)} 
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      Desqueeze Anamorphic
+                    </label>
+                  </div>
+                </div>
+
+                {/* Sizing Controls */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sizing Controls</h4>
+                  <div className="space-y-2">
+                    {settings.centerMarkerEnabled && (
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Center Marker: {settings.centerMarkerSize || 20}px</label>
+                        <input
+                          type="range"
+                          min="2"
+                          max="100"
+                          step="1"
+                          value={settings.centerMarkerSize || 20}
+                          onChange={e => handleGenericSettingChange('centerMarkerSize', Number(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </div>
+                    )}
+                    {settings.siemensStarsEnabled && (
+                      <div>
+                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Siemens Stars: {settings.siemensStarsSize || 200}px</label>
+                        <input
+                          type="range"
+                          min="10"
+                          max="2000"
+                          step="10"
+                          value={settings.siemensStarsSize || 200}
+                          onChange={e => handleGenericSettingChange('siemensStarsSize', Number(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Logo Controls */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Logo Upload</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Upload Logo</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="w-full text-xs text-gray-600 dark:text-gray-400 file:mr-2 file:py-1 file:px-2 file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300"
+                      />
+                    </div>
+                    {settings.customLogoUrl && (
+                      <>
+                        <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={settings.customLogoEnabled || false} 
+                            onChange={e => handleGenericSettingChange('customLogoEnabled', e.target.checked)} 
+                            className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          Show Logo
+                        </label>
+                        {settings.customLogoEnabled && (
+                          <>
+                            <div>
+                              <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {settings.customLogoSize || 15}%</label>
+                              <input
+                                type="range"
+                                min="1"
+                                max="150"
+                                step="1"
+                                value={settings.customLogoSize || 15}
+                                onChange={e => handleGenericSettingChange('customLogoSize', Number(e.target.value))}
+                                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">X: {settings.customLogoPosition?.x || 50}%</label>
+                                <input 
+                                  type="range" 
+                                  min="0" 
+                                  max="100" 
+                                  step="1" 
+                                  value={settings.customLogoPosition?.x || 50} 
+                                  onChange={e => handleGenericSettingChange('customLogoPosition', { ...(settings.customLogoPosition || {x:50,y:50}), x: Number(e.target.value)})} 
+                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Y: {settings.customLogoPosition?.y || 50}%</label>
+                                <input 
+                                  type="range" 
+                                  min="0" 
+                                  max="100" 
+                                  step="1" 
+                                  value={settings.customLogoPosition?.y || 50} 
+                                  onChange={e => handleGenericSettingChange('customLogoPosition', { ...(settings.customLogoPosition || {x:50,y:50}), y: Number(e.target.value)})} 
+                                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="text-center pt-2">
+              {/* Text Elements with Full Styling */}
+              <div className="space-y-2">
+                {(['title', 'director', 'dp', 'text1', 'text2'] as const).map((key) => {
+                const currentSettings = settings[key];
+                const allAvailableFonts = [...PREDEFINED_FONTS, ...(settings?.customFonts || []).map(font => ({ name: font.name, family: font.family }))];
+                
+                let labelText = key.charAt(0).toUpperCase() + key.slice(1);
+                let placeholderText = labelText;
+                if (key === 'dp') {
+                  labelText = 'DP';
+                  placeholderText = 'Cinematographer Name';
+                } else if (key === 'text1') {
+                  labelText = 'Custom Text 1';
+                  placeholderText = 'Custom Text 1';
+                } else if (key === 'text2') {
+                  labelText = 'Custom Text 2';
+                  placeholderText = 'Custom Text 2';
+                } else if (key === 'title') {
+                  labelText = 'Production Title';
+                  placeholderText = 'Production Title';
+                } else if (key === 'director') {
+                  placeholderText = 'Director Name';
+                }
+                
+                return (
+                  <div key={key} className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-medium text-gray-700 dark:text-gray-300">{labelText}</h4>
+                      <label className="flex items-center text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+                        <input 
+                          type="checkbox" 
+                          checked={currentSettings.visible} 
+                          onChange={e => handleTextElementChange(key, 'visible', e.target.checked)} 
+                          className="mr-1 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        Show
+                      </label>
+                    </div>
+                    
+                    {currentSettings.visible && (
+                      <>
+                        <div className="mb-2">
+                          <input
+                            type="text"
+                            value={currentSettings.text}
+                            onChange={e => handleTextElementChange(key, 'text', e.target.value)}
+                            placeholder={placeholderText}
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        {/* Font Family */}
+                        <div className="mb-2">
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Font Family</label>
+                          <select 
+                            value={currentSettings.fontFamily} 
+                            onChange={e => handleTextElementChange(key, 'fontFamily', e.target.value)} 
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          >
+                            {allAvailableFonts.map(font => (
+                              <option key={font.family} value={font.family}>{font.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        {/* Text Style Options */}
+                        <div className="mb-2">
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Text Style</label>
+                          <div className="flex gap-2">
+                            <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={currentSettings.bold} 
+                                onChange={e => handleTextElementChange(key, 'bold', e.target.checked)} 
+                                className="mr-1 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span className="font-bold">B</span>
+                            </label>
+                            <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={currentSettings.italic} 
+                                onChange={e => handleTextElementChange(key, 'italic', e.target.checked)} 
+                                className="mr-1 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span className="italic">I</span>
+                            </label>
+                            <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={currentSettings.underline} 
+                                onChange={e => handleTextElementChange(key, 'underline', e.target.checked)} 
+                                className="mr-1 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span className="underline">U</span>
+                            </label>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-1">
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Size: {currentSettings.fontSize}px</label>
+                            <input 
+                              type="range" 
+                              min="8" 
+                              max="100" 
+                              step="1" 
+                              value={currentSettings.fontSize} 
+                              onChange={e => handleTextElementChange(key, 'fontSize', Number(e.target.value))} 
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">X: {currentSettings.position.x}</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max={svgPreviewViewBoxWidth} 
+                              step="1" 
+                              value={currentSettings.position.x} 
+                              onChange={e => handleTextElementChange(key, 'position', { ...currentSettings.position, x: Number(e.target.value) })} 
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Y: {currentSettings.position.y}</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max={svgPreviewViewBoxHeight} 
+                              step="1" 
+                              value={currentSettings.position.y} 
+                              onChange={e => handleTextElementChange(key, 'position', { ...currentSettings.position, y: Number(e.target.value) })} 
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+                })}
+              </div>
+              
+              {/* Additional Tools Column */}
+              <div className="space-y-3">
+                {/* Framelines Display */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Framelines Display</h4>
+                  {validIntents.length > 0 ? (
+                    <div className="space-y-1">
+                      {validIntents.map((intent, idx) => (
+                        <label key={intent.id} className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={settings.intentVisibility[intent.id] || false}
+                            onChange={(e) => handleIntentVisibilityChange(intent.id, e.target.checked)}
+                            className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span 
+                            className="inline-block px-2 py-0.5 rounded text-xs font-semibold text-white mr-2"
+                            style={{
+                              backgroundColor: (() => {
+                                const colors = ["#ef4444", "#3b82f6", "#eab308", "#10b981", "#8b5cf6", "#ec4899"];
+                                return colors[idx % colors.length];
+                              })()
+                            }}
+                          >
+                            {intent.label || `FL${idx + 1}`}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">No framelines available</p>
+                  )}
+                </div>
+
+                {/* Camera Information Controls */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Camera Information</h4>
+                  <div className="space-y-2">
+                    <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={settings.showCameraInfo || false} 
+                        onChange={e => handleGenericSettingChange('showCameraInfo', e.target.checked)} 
+                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      Show Camera Info Box
+                    </label>
+                    
+                    {settings.showCameraInfo && (
+                      <>
+                        <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={settings.showPixelDimensions || false} 
+                            onChange={e => handleGenericSettingChange('showPixelDimensions', e.target.checked)} 
+                            className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          Show Pixel Dimensions
+                        </label>
+                        
+                        <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={settings.showSensorDimensions || false} 
+                            onChange={e => handleGenericSettingChange('showSensorDimensions', e.target.checked)} 
+                            className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          Show Sensor Dimensions
+                        </label>
+                        
+                        <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={settings.showFormatArrow || false} 
+                            onChange={e => handleGenericSettingChange('showFormatArrow', e.target.checked)} 
+                            className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          Show Frameline
+                        </label>
+                        
+                        <label className="flex items-center text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={settings.showFramingArrows || false} 
+                            onChange={e => handleGenericSettingChange('showFramingArrows', e.target.checked)} 
+                            className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          Show Format Arrows
+                        </label>
+                        
+                        {/* Individual arrow controls when multiple intents exist */}
+                        {settings.showFramingArrows && (() => {
+                          const visibleValidIntents = (fdl.framing_intents || []).filter(intent => 
+                            intent.aspect_ratio && 
+                            intent.aspect_ratio.width > 0 && 
+                            intent.aspect_ratio.height > 0 &&
+                            settings.intentVisibility[intent.id]
+                          );
+                          
+                          if (visibleValidIntents.length > 1) {
+                            const colorNames = ["Red", "Blue", "Yellow", "Green", "Purple", "Pink"];
+                            
+                            return (
+                              <div className="ml-4 mt-2 space-y-1">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Individual Arrow Controls:</div>
+                                {visibleValidIntents.map((intent, index) => {
+                                  const colorName = colorNames[index % colorNames.length];
+                                  const intentColor = intentColors[index % intentColors.length];
+                                  const isArrowVisible = settings.intentArrowVisibility?.[intent.id] !== false;
+                                  
+                                  return (
+                                    <label key={intent.id} className="flex items-center text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={isArrowVisible} 
+                                        onChange={e => {
+                                          const newVisibility = {
+                                            ...settings.intentArrowVisibility,
+                                            [intent.id]: e.target.checked
+                                          };
+                                          handleGenericSettingChange('intentArrowVisibility', newVisibility);
+                                        }} 
+                                        className="mr-2 h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                      />
+                                      <div 
+                                        className="w-3 h-3 mr-1 border border-black rounded-sm" 
+                                        style={{ backgroundColor: intentColor }}
+                                      ></div>
+                                      {colorName} Box Arrows
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
+                        {/* Camera Info Font Size */}
+                        <div>
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Font Size: {settings.cameraInfoFontSize || 12}px</label>
+                          <input 
+                            type="range" 
+                            min="8" 
+                            max="20" 
+                            step="1" 
+                            value={settings.cameraInfoFontSize || 12} 
+                            onChange={e => handleGenericSettingChange('cameraInfoFontSize', Number(e.target.value))} 
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                          />
+                        </div>
+                        
+                        {/* Camera Info Position */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">X: {settings.cameraInfoPosition?.x || 400}</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max={svgPreviewViewBoxWidth} 
+                              step="1" 
+                              value={settings.cameraInfoPosition?.x || 400} 
+                              onChange={e => handleGenericSettingChange('cameraInfoPosition', { ...(settings.cameraInfoPosition || {x:400,y:120}), x: Number(e.target.value)})} 
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Y: {settings.cameraInfoPosition?.y || 120}</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max={svgPreviewViewBoxHeight} 
+                              step="1" 
+                              value={settings.cameraInfoPosition?.y || 120} 
+                              onChange={e => handleGenericSettingChange('cameraInfoPosition', { ...(settings.cameraInfoPosition || {x:400,y:120}), y: Number(e.target.value)})} 
+                              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Font Upload */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Font Upload</h4>
+                  <input
+                    type="file"
+                    accept=".woff,.woff2,.ttf,.otf"
+                    onChange={handleFontUpload}
+                    className="w-full text-xs text-gray-600 dark:text-gray-400 file:mr-2 file:py-1 file:px-2 file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload custom fonts (.woff, .woff2, .ttf, .otf)</p>
+                </div>
+
+                {/* Export Frame Leader */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-700">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Export Frame Leader</h4>
+                  <div className="space-y-2">
+                    <button onClick={handleExportSVG} className="w-full text-xs bg-blue-600 bg-opacity-50 hover:bg-opacity-70 text-white py-1 px-2 rounded">
+                      Export SVG
+                    </button>
+                    <button onClick={() => handleExportImage('png')} className="w-full text-xs bg-green-600 bg-opacity-50 hover:bg-opacity-70 text-white py-1 px-2 rounded">
+                      Export PNG
+                    </button>
+                    <button onClick={() => handleExportImage('jpeg')} className="w-full text-xs bg-orange-600 bg-opacity-50 hover:bg-opacity-70 text-white py-1 px-2 rounded">
+                      Export JPEG
+                    </button>
+                    <button onClick={handleExportPDF} className="w-full text-xs bg-red-600 bg-opacity-50 hover:bg-opacity-70 text-white py-1 px-2 rounded">
+                      Export PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center pt-2 border-t border-gray-300 dark:border-gray-600">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Access full settings in the panel below when closed
+                </p>
                 <button
                   onClick={() => setShowFloatingControls(false)}
-                  className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                 >
-                  Close panel to access full settings below
+                  Close Floating Controls
                 </button>
+              </div>
+            </div>
+            
+            {/* Resize handle */}
+            <div 
+              className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize group"
+              onMouseDown={handleResizeMouseDown}
+              title="Drag to resize"
+            >
+              {/* Background triangle */}
+              <div 
+                className="absolute bottom-0 right-0 w-6 h-6 bg-gray-400 dark:bg-gray-500 group-hover:bg-gray-500 dark:group-hover:bg-gray-400 transition-colors"
+                style={{
+                  clipPath: 'polygon(100% 0, 0 100%, 100% 100%)',
+                }}
+              />
+              {/* Grip lines */}
+              <div className="absolute bottom-1 right-1 flex flex-col gap-0.5">
+                <div className="w-2 h-0.5 bg-white dark:bg-gray-200 opacity-80"></div>
+                <div className="w-1.5 h-0.5 bg-white dark:bg-gray-200 opacity-80 ml-0.5"></div>
+                <div className="w-1 h-0.5 bg-white dark:bg-gray-200 opacity-80 ml-1"></div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+
 
       {/* Fullscreen Preview Modal */}
       {isFullscreenPreview && (

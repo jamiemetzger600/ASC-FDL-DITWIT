@@ -1707,6 +1707,7 @@ const FDLEditor: React.FC = () => {
                         fdl={fdl} 
                         visualizedContextIndex={selectedVisualizedContextIndex} 
                         selectedCameraSelections={selectedCameraSelections}
+                        uiMode={uiMode}
                       />
                     </div>
                   )}
@@ -1715,28 +1716,12 @@ const FDLEditor: React.FC = () => {
                 {/* Frame Leader Editor - Conditional based on UI mode */}
                 {(fdl.contexts && fdl.contexts.length > 0 && selectedVisualizedContextIndex !== null) && (
                   <>
-                    {uiMode === 'current' ? (
-                      <FrameLeaderEditor 
-                        fdl={fdl} 
-                        visualizedContextIndex={selectedVisualizedContextIndex} 
-                        onChange={updateFDL}
-                      />
-                    ) : (
-                      <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-400 dark:border-gray-600 p-6">
-                        <div className="text-center py-8">
-                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                            Floating UI Mode Active
-                          </h3>
-                          <p className="text-gray-600 dark:text-gray-400 mb-4">
-                            Frame Leader controls are now available as floating panels. 
-                            Look for the <strong>Quick Controls</strong> panel that appears when you interact with the preview above.
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-500">
-                            This gives you more space to see your frame leader preview while keeping tools accessible.
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    <FrameLeaderEditor 
+                      fdl={fdl} 
+                      visualizedContextIndex={selectedVisualizedContextIndex} 
+                      onChange={updateFDL}
+                      uiMode={uiMode}
+                    />
                   </>
                 )}
         </div>
